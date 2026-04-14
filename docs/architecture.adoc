@@ -1,0 +1,288 @@
+= Family Tree – Architecture Documentation
+:toc: left
+:toc-title: Contents
+:toclevels: 3
+:sectnums:
+:icons: font
+:source-highlighter: rouge
+
+== Overview
+
+Family Tree is a privacy-first, browser-only web application for visualizing and managing family genealogy data.
+All data is stored exclusively in the user's browser via the Web Storage API (localStorage).
+No server, no account, no network requests after initial page load.
+
+The application is a static site deployable to GitHub Pages, requiring no build step.
+
+== Goals and Constraints
+
+* **Privacy**: All data stays in the browser. No external API calls for data.
+* **Data ownership**: Full JSON export/import for portability.
+* **Static deployment**: Pure HTML, CSS, and vanilla JavaScript. No server-side rendering.
+* **No frameworks**: Vanilla JS (ES6+). D3.js is the only external library, used for tree visualisation.
+* **Multiple families**: The user can manage several independent family datasets.
+
+== High-Level Architecture
+
+[plantuml, architecture-overview, svg]
+....
+@startuml
+actor User
+
+package "Browser" {
+  [index.html] --> [app.js]
+  [app.js] --> [storage.js]
+  [app.js] --> [list.js]
+  [app.js] --> [tree.js]
+  [app.js] --> [modals.js]
+
+  database "localStorage" as LS
+  [storage.js] --> LS
+}
+
+[app.js] ..> [data/sample-family.json] : fetch on first load
+@enduml
+....
+
+On first load the application fetches `data/sample-family.json` via `fetch()` and stores it in localStorage.
+Subsequent loads read exclusively from localStorage.
+
+== File Structure
+
+[source]
+----
+/
+├── index.html               # Entry point, all markup and modal templates
+├── css/
+│   └── style.css            # Single stylesheet (dark theme, responsive)
+├── js/
+│   ├── storage.js           # localStorage CRUD helpers
+│   ├── modals.js            # Modal open/close, person detail & edit logic
+│   ├── list.js              # List view rendering with full-text search
+│   ├── tree.js              # D3 v7 tree rendering
+│   └── app.js               # Bootstrap, family selector, import/export
+├── data/
+│   └── sample-family.json   # Pre-loaded sample family with edge cases
+└── docs/
+    └── architecture.adoc    # This document
+----
+
+== Data Model
+
+=== Family Registry
+
+Two localStorage keys manage the family catalogue:
+
+|===
+| Key | Value | Purpose
+
+| `familyTree_families`
+| `[{"id":"…","name":"…"}, …]`
+| Master list of all families
+
+| `familyTree_active`
+| `"<family-id>"`
+| Currently selected family
+
+| `familyTree_data_{id}`
+| `{persons:[…], partnerships:[…]}`
+| Full data for a specific family
+|===
+
+=== Person Object
+
+[source,json]
+----
+{
+  "id":          "uuid-v4-string",
+  "name":        "Full Name",
+  "description": "Optional biography",
+  "birthDate":   "YYYY-MM-DD",
+  "deathDate":   "YYYY-MM-DD",    // optional
+  "image":       "https://… or data:image/…",  // optional
+  "parents": [
+    { "personId": "uuid-of-parent", "type": "mother" },
+    { "personId": "uuid-of-parent", "type": "father" },
+    { "personId": "uuid-of-parent", "type": "adopted" }
+  ]
+}
+----
+
+Parent types: `mother`, `father`, `adopted`.
+A person may have multiple parent references (e.g. biological mother + adoptive father).
+
+=== Partnership Object
+
+[source,json]
+----
+{
+  "id":        "uuid-v4-string",
+  "person1Id": "uuid",
+  "person2Id": "uuid",
+  "type":      "marriage | divorced | partner",
+  "startDate": "YYYY-MM-DD",   // optional
+  "endDate":   "YYYY-MM-DD"    // optional – for divorces / death of spouse
+}
+----
+
+=== Sample Family Edge Cases
+
+The bundled `data/sample-family.json` demonstrates:
+
+* Regular marriage (pp1)
+* First marriage ending in death of spouse (pp2 → pp3: remarriage)
+* Second marriage ending in natural death, followed by third marriage (pp4 → pp5)
+* Divorced partnership still alive (pp7 → pp8: new partner)
+* Adopted child (persons p8)
+* Unmarried partner (pp8, pp9)
+* Four generations of descendants
+
+== Component Breakdown
+
+=== storage.js
+
+Pure utility module, no DOM access.
+
+* `getFamilies()` / `saveFamilies()` – manage the family index.
+* `getFamilyData(id)` / `saveFamilyData(id, data)` – per-family data access.
+* `createFamily(name, data)` – generates a UUID, registers the family, stores data.
+* `deleteFamily(id)` – removes both the index entry and data key.
+* `generateId()` – uses `crypto.randomUUID()` with a Math.random fallback.
+
+=== modals.js
+
+Manages five modal dialogs:
+
+|===
+| Modal ID | Purpose
+
+| `person-detail-modal`
+| Read-only view of a person with navigation links to relatives
+
+| `edit-modal`
+| Create or edit a person; dynamic parent row builder
+
+| `export-modal`
+| Shows pretty-printed JSON; copy and download actions
+
+| `import-modal`
+| Paste JSON or load from file; validates structure before import
+
+|===
+
+Key helpers:
+
+* `sanitizeImageUrl(url)` – strips anything that is not `https:`, `http:`, or `data:image/` before inserting into the DOM, preventing XSS via crafted image URLs.
+* `formatDate(dateStr)` – locale-aware date formatting.
+* `getInitials(name)` – generates a 1-2 character avatar placeholder.
+
+=== list.js
+
+Renders a responsive card grid of all persons in the active family.
+
+* Full-text search across `name` and `description` fields (case-insensitive).
+* Each card shows avatar (image or initials), name, dates, living/deceased badge, and adopted badge.
+* Clicking a card opens the `person-detail-modal`.
+
+=== tree.js
+
+D3 v7 hierarchical tree renderer.
+
+==== Algorithm
+
+1. Read the selected root person and depth from the controls.
+2. `collectDescendants()` walks the child graph up to `maxDepth` using a `Set` to avoid revisiting nodes.
+3. Build a tree-compatible object graph: each node gets a `children` array.
+4. Deduplicate: prevent the same node appearing twice (handles DAGs).
+5. Pass the root to `d3.hierarchy()` then `d3.tree()` with `nodeSize`.
+6. Draw:
+   ** Parent-child links as `d3.linkVertical()` paths.
+   ** Partnership links as quadratic Bézier curves coloured by type.
+   ** Nodes as `<circle>` + optional `<image>` (with `<clipPath>`) + text labels.
+7. Fit the resulting bounding box to the viewport via `d3.zoomIdentity`.
+
+==== Visual Design
+
+|===
+| Element | Style
+
+| Living person node
+| Blue fill, green stroke
+
+| Deceased person node
+| Dark red fill, red stroke
+
+| Parent → child edge
+| Solid grey line
+
+| Adopted edge
+| Dashed cyan line
+
+| Marriage edge
+| Solid blue curve
+
+| Divorced edge
+| Dashed orange curve
+
+| Partner edge
+| Dotted purple curve
+|===
+
+Zoom and pan are enabled via `d3.zoom()`. The tree auto-fits on each render.
+
+=== app.js
+
+Top-level coordinator.
+
+* `boot()` – called on `DOMContentLoaded`. Loads sample family on first run, wires all events.
+* `refresh()` – re-renders list and, if the tree tab is active, the tree.
+* `bindEvents()` – attaches all UI event listeners (tabs, family selector, import/export, etc.).
+* `doImport()` – validates JSON structure and creates a new family from it.
+* `showToast(msg, type)` – small non-blocking notification system.
+
+== Storage Strategy
+
+Only `localStorage` is used.
+The maximum storage per origin is typically 5–10 MB.
+Base64-encoded images embedded as data URIs consume significant space; users should prefer hosted image URLs for large families.
+
+Key naming convention: `familyTree_` prefix avoids collisions with other apps sharing the same origin.
+
+== Security Considerations
+
+* **XSS via image URLs**: User-supplied image URLs are sanitised in `sanitizeImageUrl()` before being set as `src` attributes. Only `https:`, `http:`, and `data:image/` prefixes are allowed.
+* **JSON import**: Parsed with `JSON.parse()` in a try/catch; no `eval`. Only the `persons` and `partnerships` arrays are consumed; arbitrary keys are ignored.
+* **No `innerHTML` with user data**: User-provided strings are always set via `.textContent` or created as `Text` nodes, not injected as HTML.
+* **CSP**: No inline event handlers in HTML (all wired via `addEventListener`).
+
+== Deployment
+
+=== GitHub Pages
+
+1. Push the repository to GitHub.
+2. In *Settings → Pages*, set the source to the `main` branch, root (`/`) folder.
+3. The site is live at `https://<org>.github.io/<repo>/`.
+
+No build step is required. D3 is loaded from the jsDelivr CDN with Subresource Integrity (SRI) verification.
+
+=== Local Development
+
+[source,bash]
+----
+# Any static file server works, e.g.:
+npx serve .
+# or
+python3 -m http.server 8080
+----
+
+Opening `index.html` directly as a `file://` URL will cause the sample-data `fetch()` to fail in some browsers (CORS restriction on file:// origins).
+Using a local HTTP server avoids this.
+
+== Future Improvements
+
+* **Ancestry view**: Show ancestors (parents, grandparents) rather than descendants.
+* **Partnership management UI**: Add/edit partnerships from the application without manually importing JSON.
+* **Timeline view**: Chronological life event display.
+* **PWA / Service Worker**: Offline support and installability.
+* **IndexedDB backend**: Larger storage capacity for families with many images.
+* **Dark/light theme toggle**.
