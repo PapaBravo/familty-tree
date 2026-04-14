@@ -1,0 +1,278 @@
+{
+  "name": "Sample Family",
+  "persons": [
+    {
+      "id": "p1",
+      "name": "George Harrison Sr.",
+      "description": "Patriarch of the Harrison family. Worked as a carpenter for 40 years.",
+      "birthDate": "1920-03-15",
+      "deathDate": "1998-11-02",
+      "image": "",
+      "parents": []
+    },
+    {
+      "id": "p2",
+      "name": "Margaret Harrison",
+      "description": "Matriarch. Loved gardening and was known for her apple pies.",
+      "birthDate": "1923-07-04",
+      "deathDate": "2001-05-18",
+      "image": "",
+      "parents": []
+    },
+    {
+      "id": "p3",
+      "name": "Robert Harrison",
+      "description": "Eldest son of George and Margaret. Engineer, loves hiking.",
+      "birthDate": "1948-02-10",
+      "image": "",
+      "parents": [
+        { "personId": "p1", "type": "father" },
+        { "personId": "p2", "type": "mother" }
+      ]
+    },
+    {
+      "id": "p4",
+      "name": "Susan Harrison (née Clark)",
+      "description": "Robert's first wife. Died young in a car accident.",
+      "birthDate": "1950-09-22",
+      "deathDate": "1978-06-14",
+      "image": "",
+      "parents": []
+    },
+    {
+      "id": "p5",
+      "name": "Linda Harrison (née Moore)",
+      "description": "Robert's second wife after Susan's death. Teacher, passionate about education.",
+      "birthDate": "1955-04-30",
+      "image": "",
+      "parents": []
+    },
+    {
+      "id": "p6",
+      "name": "Thomas Harrison",
+      "description": "Son of Robert and Susan. Software developer living in New York.",
+      "birthDate": "1975-12-01",
+      "image": "",
+      "parents": [
+        { "personId": "p3", "type": "father" },
+        { "personId": "p4", "type": "mother" }
+      ]
+    },
+    {
+      "id": "p7",
+      "name": "Emily Harrison",
+      "description": "Daughter of Robert and Linda. Veterinarian.",
+      "birthDate": "1982-08-19",
+      "image": "",
+      "parents": [
+        { "personId": "p3", "type": "father" },
+        { "personId": "p5", "type": "mother" }
+      ]
+    },
+    {
+      "id": "p8",
+      "name": "Jake Harrison",
+      "description": "Adopted son of Robert and Linda. Joined the family at age 3.",
+      "birthDate": "1985-03-07",
+      "image": "",
+      "parents": [
+        { "personId": "p3", "type": "adopted" },
+        { "personId": "p5", "type": "adopted" }
+      ]
+    },
+    {
+      "id": "p9",
+      "name": "Dorothy Harrison",
+      "description": "Youngest daughter of George and Margaret. Artist.",
+      "birthDate": "1952-11-28",
+      "image": "",
+      "parents": [
+        { "personId": "p1", "type": "father" },
+        { "personId": "p2", "type": "mother" }
+      ]
+    },
+    {
+      "id": "p10",
+      "name": "Frank Wilson",
+      "description": "Dorothy's husband. Retired accountant.",
+      "birthDate": "1950-05-05",
+      "deathDate": "2010-09-20",
+      "image": "",
+      "parents": []
+    },
+    {
+      "id": "p11",
+      "name": "Harold Wilson",
+      "description": "Dorothy's second husband after Frank's death. Retired teacher.",
+      "birthDate": "1948-01-12",
+      "image": "",
+      "parents": []
+    },
+    {
+      "id": "p12",
+      "name": "Claire Wilson",
+      "description": "Daughter of Dorothy and Frank. Nurse.",
+      "birthDate": "1977-06-03",
+      "image": "",
+      "parents": [
+        { "personId": "p9", "type": "mother" },
+        { "personId": "p10", "type": "father" }
+      ]
+    },
+    {
+      "id": "p13",
+      "name": "James Wilson",
+      "description": "Son of Dorothy and Frank. Chef and restaurant owner.",
+      "birthDate": "1980-10-14",
+      "image": "",
+      "parents": [
+        { "personId": "p9", "type": "mother" },
+        { "personId": "p10", "type": "father" }
+      ]
+    },
+    {
+      "id": "p14",
+      "name": "Alice Thompson",
+      "description": "Thomas's wife. Graphic designer.",
+      "birthDate": "1977-03-25",
+      "image": "",
+      "parents": []
+    },
+    {
+      "id": "p15",
+      "name": "Oliver Harrison",
+      "description": "Son of Thomas and Alice. Currently in high school.",
+      "birthDate": "2005-07-11",
+      "image": "",
+      "parents": [
+        { "personId": "p6", "type": "father" },
+        { "personId": "p14", "type": "mother" }
+      ]
+    },
+    {
+      "id": "p16",
+      "name": "Sophie Harrison",
+      "description": "Daughter of Thomas and Alice. Loves music and plays the violin.",
+      "birthDate": "2008-01-29",
+      "image": "",
+      "parents": [
+        { "personId": "p6", "type": "father" },
+        { "personId": "p14", "type": "mother" }
+      ]
+    },
+    {
+      "id": "p17",
+      "name": "Mark Peters",
+      "description": "Emily's ex-husband. Divorced amicably.",
+      "birthDate": "1980-05-17",
+      "image": "",
+      "parents": []
+    },
+    {
+      "id": "p18",
+      "name": "Noah Peters",
+      "description": "Son of Emily and Mark.",
+      "birthDate": "2007-09-03",
+      "image": "",
+      "parents": [
+        { "personId": "p7", "type": "mother" },
+        { "personId": "p17", "type": "father" }
+      ]
+    },
+    {
+      "id": "p19",
+      "name": "Daniel Carter",
+      "description": "Emily's current partner.",
+      "birthDate": "1979-12-22",
+      "image": "",
+      "parents": []
+    },
+    {
+      "id": "p20",
+      "name": "Mia Carter",
+      "description": "Daughter of Emily and Daniel.",
+      "birthDate": "2015-04-17",
+      "image": "",
+      "parents": [
+        { "personId": "p7", "type": "mother" },
+        { "personId": "p19", "type": "father" }
+      ]
+    },
+    {
+      "id": "p21",
+      "name": "Sam Harrison",
+      "description": "Jake's partner. Graphic novelist.",
+      "birthDate": "1987-08-08",
+      "image": "",
+      "parents": []
+    }
+  ],
+  "partnerships": [
+    {
+      "id": "pp1",
+      "person1Id": "p1",
+      "person2Id": "p2",
+      "type": "marriage",
+      "startDate": "1945-06-20"
+    },
+    {
+      "id": "pp2",
+      "person1Id": "p3",
+      "person2Id": "p4",
+      "type": "marriage",
+      "startDate": "1973-04-12",
+      "endDate": "1978-06-14"
+    },
+    {
+      "id": "pp3",
+      "person1Id": "p3",
+      "person2Id": "p5",
+      "type": "marriage",
+      "startDate": "1981-09-05"
+    },
+    {
+      "id": "pp4",
+      "person1Id": "p9",
+      "person2Id": "p10",
+      "type": "marriage",
+      "startDate": "1975-08-14",
+      "endDate": "2010-09-20"
+    },
+    {
+      "id": "pp5",
+      "person1Id": "p9",
+      "person2Id": "p11",
+      "type": "marriage",
+      "startDate": "2013-02-14"
+    },
+    {
+      "id": "pp6",
+      "person1Id": "p6",
+      "person2Id": "p14",
+      "type": "marriage",
+      "startDate": "2003-07-19"
+    },
+    {
+      "id": "pp7",
+      "person1Id": "p7",
+      "person2Id": "p17",
+      "type": "divorced",
+      "startDate": "2006-05-11",
+      "endDate": "2013-10-01"
+    },
+    {
+      "id": "pp8",
+      "person1Id": "p7",
+      "person2Id": "p19",
+      "type": "partner",
+      "startDate": "2014-03-08"
+    },
+    {
+      "id": "pp9",
+      "person1Id": "p8",
+      "person2Id": "p21",
+      "type": "partner",
+      "startDate": "2012-11-20"
+    }
+  ]
+}

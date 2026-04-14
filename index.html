@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Family Tree</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+<div id="app">
+
+  <!-- ===== Navigation Bar ===================================== -->
+  <nav id="navbar">
+    <h1>🌳 Family Tree</h1>
+
+    <div id="family-selector">
+      <label for="family-select" style="color:var(--text-muted);font-size:.9rem">Family:</label>
+      <select id="family-select" title="Select active family"></select>
+      <button id="new-family-btn" class="nav-btn" title="Create new family">＋ New</button>
+      <button id="delete-family-btn" class="nav-btn danger" title="Delete current family">🗑</button>
+    </div>
+
+    <span class="spacer"></span>
+
+    <button id="add-person-btn" class="nav-btn primary">＋ Person</button>
+    <button id="import-btn" class="nav-btn">⬆ Import</button>
+    <button id="export-btn" class="nav-btn">⬇ Export</button>
+  </nav>
+
+  <!-- ===== Tabs ================================================ -->
+  <div id="tabs">
+    <button class="tab-btn active" data-panel="list-panel">📋 List</button>
+    <button class="tab-btn" data-panel="tree-panel">🌿 Tree</button>
+  </div>
+
+  <!-- ===== Panels ============================================== -->
+  <div id="panels">
+
+    <!-- List Panel -->
+    <div id="list-panel" class="panel active">
+      <div id="list-controls">
+        <input id="search-input" type="search" placeholder="Search by name or description…" autocomplete="off" />
+        <button id="add-person-list-btn" class="nav-btn primary" onclick="openEditModal(null)">＋ Add Person</button>
+        <span id="person-count"></span>
+      </div>
+      <div id="person-list"></div>
+    </div>
+
+    <!-- Tree Panel -->
+    <div id="tree-panel" class="panel">
+      <div id="tree-controls">
+        <label for="root-select">Root:</label>
+        <select id="root-select" title="Select root person for the tree"></select>
+        <label for="depth-input">Depth:</label>
+        <input id="depth-input" type="number" value="3" min="1" max="10" />
+        <button id="render-btn">Render Tree</button>
+      </div>
+
+      <div id="tree-container">
+        <svg id="tree-svg"></svg>
+
+        <!-- Legend -->
+        <div id="legend">
+          <h4>Legend</h4>
+          <div class="legend-item">
+            <div class="legend-circle" style="border-color:var(--living)"></div>
+            <span>Living</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-circle" style="border-color:var(--deceased)"></div>
+            <span>Deceased</span>
+          </div>
+          <hr style="border-color:var(--surface2);margin:6px 0">
+          <div class="legend-item">
+            <div class="legend-line" style="background:var(--text-muted)"></div>
+            <span>Parent / Child</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-line" style="background:var(--adopted);height:2px;border-top:2px dashed var(--adopted);background:transparent"></div>
+            <span>Adopted</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-line" style="background:var(--marriage)"></div>
+            <span>Marriage</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-line" style="background:var(--divorced);background:transparent;border-top:2px dashed var(--divorced)"></div>
+            <span>Divorced</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-line" style="background:transparent;border-top:2px dotted var(--partner)"></div>
+            <span>Partner</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /panels -->
+
+</div><!-- /app -->
+
+<!-- ===== Toast =============================================== -->
+<div id="toast"></div>
+
+<!-- ===== Modals ============================================== -->
+
+<!-- Person Detail Modal -->
+<div id="person-detail-modal" class="modal-overlay">
+  <div class="modal wide">
+    <div class="modal-header">
+      <h2 id="detail-name">Person</h2>
+      <button class="modal-close" id="detail-close-btn">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="detail-header">
+        <div class="detail-avatar" id="detail-avatar"></div>
+        <div class="detail-info">
+          <div class="detail-dates" id="detail-dates"></div>
+          <span id="detail-status" class="badge"></span>
+        </div>
+      </div>
+      <p class="detail-desc" id="detail-desc"></p>
+      <div class="detail-section">
+        <h4>Parents</h4>
+        <ul id="detail-parents"></ul>
+      </div>
+      <div class="detail-section">
+        <h4>Children</h4>
+        <ul id="detail-children"></ul>
+      </div>
+      <div class="detail-section">
+        <h4>Partnerships</h4>
+        <ul id="detail-partners"></ul>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="nav-btn primary" id="detail-edit-btn">✏ Edit</button>
+      <button class="nav-btn" id="detail-close-footer-btn" onclick="closeModal('person-detail-modal')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit / New Person Modal -->
+<div id="edit-modal" class="modal-overlay">
+  <div class="modal wide">
+    <div class="modal-header">
+      <h2 id="edit-modal-title">Edit Person</h2>
+      <button class="modal-close" onclick="closeModal('edit-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label for="edit-name">Full Name *</label>
+        <input id="edit-name" type="text" placeholder="e.g. Jane Doe" />
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="edit-birth">Date of Birth</label>
+          <input id="edit-birth" type="date" />
+        </div>
+        <div class="form-group">
+          <label for="edit-death">Date of Death</label>
+          <input id="edit-death" type="date" />
+        </div>
+      </div>
+      <div class="form-group">
+        <label for="edit-description">Description / Bio</label>
+        <textarea id="edit-description" placeholder="Short biography…"></textarea>
+      </div>
+      <div class="form-group">
+        <label for="edit-image">Photo URL (https:// or data:image/…)</label>
+        <input id="edit-image" type="url" placeholder="https://example.com/photo.jpg" />
+      </div>
+      <div class="form-group">
+        <label>Parents</label>
+        <div id="parents-list"></div>
+        <button id="add-parent-btn" class="nav-btn" style="margin-top:6px">＋ Add Parent</button>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="nav-btn danger" id="edit-delete-btn">🗑 Delete</button>
+      <span class="spacer"></span>
+      <button class="nav-btn" id="edit-cancel-btn">Cancel</button>
+      <button class="nav-btn primary" id="edit-save-btn">💾 Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Export Modal -->
+<div id="export-modal" class="modal-overlay">
+  <div class="modal wide">
+    <div class="modal-header">
+      <h2>Export Family Data</h2>
+      <button class="modal-close" id="export-close-btn">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="margin-bottom:12px;color:var(--text-muted)">Copy or download the JSON below to back up or share this family.</p>
+      <textarea id="export-output" readonly></textarea>
+    </div>
+    <div class="modal-footer">
+      <button class="nav-btn" id="export-copy-btn">📋 Copy</button>
+      <button class="nav-btn primary" id="export-download-btn">⬇ Download JSON</button>
+    </div>
+  </div>
+</div>
+
+<!-- Import Modal -->
+<div id="import-modal" class="modal-overlay">
+  <div class="modal wide">
+    <div class="modal-header">
+      <h2>Import Family Data</h2>
+      <button class="modal-close" onclick="closeModal('import-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="margin-bottom:12px;color:var(--text-muted)">Paste JSON below or load from a file. This creates a new family entry.</p>
+      <button class="nav-btn" id="import-file-btn" style="margin-bottom:10px">📂 Load from file…</button>
+      <input type="file" id="import-file-input" accept=".json,application/json" style="display:none" />
+      <textarea id="import-input" placeholder='{"name":"My Family","persons":[...],"partnerships":[]}'></textarea>
+    </div>
+    <div class="modal-footer">
+      <button class="nav-btn" id="import-cancel-btn">Cancel</button>
+      <button class="nav-btn primary" id="import-confirm-btn">⬆ Import</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Scripts ============================================= -->
+<!-- D3 v7 -->
+<script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"
+        integrity="sha256-kpDPFM01s4nFBUFCpj3oIBv6LqHUqDwh0k8RgVAqGHU="
+        crossorigin="anonymous"></script>
+
+<!-- App scripts -->
+<script src="js/storage.js"></script>
+<script src="js/modals.js"></script>
+<script src="js/list.js"></script>
+<script src="js/tree.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
