@@ -1,1 +1,1 @@
-# familty-tree
+# family-tree
