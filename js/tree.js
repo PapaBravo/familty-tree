@@ -172,8 +172,6 @@ function renderTree() {
   allNodes.forEach((n, i) => {
     const safeUrl = sanitizeImageUrl(n.data.image);
     if (safeUrl) {
-      g.select(`.node:nth-child(${i + 1 + root.links().length + partnerships.length}) image`);
-      // Append image directly on the node group
       nodeGroups.filter((d, j) => j === i)
         .append('image')
         .attr('href', safeUrl)

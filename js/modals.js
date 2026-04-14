@@ -324,10 +324,15 @@ function formatDate(dateStr) {
  * Sanitize image URLs – only allow http(s) and data URIs.
  * Returns empty string for anything else.
  */
+// Only allow well-formed data URIs for common image types (base64 only).
+const SAFE_DATA_URI = /^data:image\/(png|jpeg|gif|webp|svg\+xml);base64,[A-Za-z0-9+/]+=*$/;
+
 function sanitizeImageUrl(url) {
   if (!url || typeof url !== 'string') return '';
   const trimmed = url.trim();
-  if (trimmed.startsWith('data:image/')) return trimmed;
+  if (trimmed.startsWith('data:')) {
+    return SAFE_DATA_URI.test(trimmed) ? trimmed : '';
+  }
   try {
     const parsed = new URL(trimmed);
     if (parsed.protocol === 'https:' || parsed.protocol === 'http:') {
