@@ -88,13 +88,22 @@ function renderTree() {
   );
   const currentPartnerships = partnerships.filter(pp => isCurrentPartnership(pp, personById));
 
-  // Build hierarchy rooted at selected person
-  const nodeMap = {};
-  persons.forEach(p => { nodeMap[p.id] = { ...p, children: [] }; });
+  let allNodes = [];
+  let nodePositions = {};
+  let parentChildEdges = [];
+  let treeNodes = [];
 
   if (renderMode === 'ancestors') {
-    buildConnectedAncestorHierarchy(rootId, persons, nodeMap);
+    const graphLayout = buildAncestorGraphLayout(rootId, persons, partnerships);
+    if (!graphLayout) { clearTree('Root not found'); return; }
+    parentChildEdges = graphLayout.parentChildEdges;
+    allNodes = graphLayout.nodes.map(n => ({ data: n.person, x: n.x, y: n.y }));
+    allNodes.forEach(n => { nodePositions[n.data.id] = { x: n.x, y: n.y }; });
   } else {
+    // Build hierarchy rooted at selected person
+    const nodeMap = {};
+    persons.forEach(p => { nodeMap[p.id] = { ...p, children: [] }; });
+
     persons.forEach(p => {
       (p.parents || []).forEach(pRef => {
         if (nodeMap[pRef.personId] && pRef.personId !== p.id) {
@@ -103,27 +112,29 @@ function renderTree() {
         }
       });
     });
+
+    const rootNode = nodeMap[rootId];
+    if (!rootNode) { clearTree('Root not found'); return; }
+
+    // Remove circular references for d3 hierarchy (deduplicate children)
+    const seen = new Set();
+    function dedupe(node) {
+      if (seen.has(node.id)) { return null; }
+      seen.add(node.id);
+      node.children = node.children.map(dedupe).filter(Boolean);
+      return node;
+    }
+    dedupe(rootNode);
+
+    const root = d3.hierarchy(rootNode);
+    const treeLayout = d3.tree()
+      .nodeSize([H_SEP, V_SEP])
+      .separation((a, b) => (a.parent === b.parent ? 1.2 : 1.6));
+
+    treeLayout(root);
+    treeNodes = root.descendants();
+    treeNodes.forEach(n => { nodePositions[n.data.id] = { x: n.x, y: n.y }; });
   }
-
-  const rootNode = nodeMap[rootId];
-  if (!rootNode) { clearTree('Root not found'); return; }
-
-  // Remove circular references for d3 hierarchy (deduplicate children)
-  const seen = new Set();
-  function dedupe(node) {
-    if (seen.has(node.id)) { return null; }
-    seen.add(node.id);
-    node.children = node.children.map(dedupe).filter(Boolean);
-    return node;
-  }
-  dedupe(rootNode);
-
-  const root = d3.hierarchy(rootNode);
-  const treeLayout = d3.tree()
-    .nodeSize([H_SEP, V_SEP])
-    .separation((a, b) => (a.parent === b.parent ? 1.2 : 1.6));
-
-  treeLayout(root);
 
   // Draw
   const g = _svg.select('#tree-g');
@@ -134,25 +145,36 @@ function renderTree() {
   const H = svgEl.clientHeight || 600;
 
   // Parent-child links
-  const linkGen = d3.linkVertical().x(d => d.x).y(d => d.y);
-  g.selectAll('.link.parent-child')
-    .data(root.links())
-    .join('path')
-    .attr('class', d => {
-      const rel = getParentChildRelation(d.source.data, d.target.data);
-      const type = rel ? rel.type : 'parent-child';
-      return `link ${type === 'adopted' ? 'adopted' : 'parent-child'}`;
-    })
-    .attr('d', linkGen);
+  if (renderMode === 'ancestors') {
+    g.selectAll('.link.parent-child')
+      .data(parentChildEdges)
+      .join('path')
+      .attr('class', d => `link ${d.type === 'adopted' ? 'adopted' : 'parent-child'}`)
+      .attr('d', d => {
+        const source = nodePositions[d.parentId];
+        const target = nodePositions[d.childId];
+        if (!source || !target) return '';
+        return `M${source.x},${source.y} L${target.x},${target.y}`;
+      });
+  } else {
+    const linkGen = d3.linkVertical().x(d => d.x).y(d => d.y);
+    g.selectAll('.link.parent-child')
+      .data(treeNodes.map(node => node.parent ? { source: node.parent, target: node } : null).filter(Boolean))
+      .join('path')
+      .attr('class', d => {
+        const rel = getParentChildRelation(d.source.data, d.target.data);
+        const type = rel ? rel.type : 'parent-child';
+        return `link ${type === 'adopted' ? 'adopted' : 'parent-child'}`;
+      })
+      .attr('d', linkGen);
+  }
 
   // Partnership links (horizontal)
-  const treeNodes = root.descendants();
-  const nodePositions = {};
-  treeNodes.forEach(n => { nodePositions[n.data.id] = { x: n.x, y: n.y }; });
-  const partnershipsForPlacement = renderMode === 'ancestors' ? partnerships : currentPartnerships;
-  const partnerNodes = buildPartnerOnlyNodes(persons, treeNodes, partnershipsForPlacement, nodePositions);
-  const allNodes = treeNodes.concat(partnerNodes.map(p => ({ data: p.person, x: p.x, y: p.y })));
-  partnerNodes.forEach(p => { nodePositions[p.person.id] = { x: p.x, y: p.y }; });
+  if (renderMode !== 'ancestors') {
+    const partnerNodes = buildPartnerOnlyNodes(persons, treeNodes, currentPartnerships, nodePositions);
+    allNodes = treeNodes.concat(partnerNodes.map(p => ({ data: p.person, x: p.x, y: p.y })));
+    partnerNodes.forEach(p => { nodePositions[p.person.id] = { x: p.x, y: p.y }; });
+  }
 
   partnerships.forEach(pp => {
     const pos1 = nodePositions[pp.person1Id];
@@ -317,38 +339,125 @@ function isCurrentPartnership(partnership, personById) {
   return true;
 }
 
-function buildConnectedAncestorHierarchy(rootId, persons, nodeMap) {
-  const adjacency = {};
-  persons.forEach(p => { adjacency[p.id] = new Set(); });
+function buildAncestorGraphLayout(rootId, persons, partnerships) {
+  const personById = {};
+  persons.forEach(p => { personById[p.id] = p; });
+  if (!personById[rootId]) return null;
+
+  const parentChildEdges = getIncludedParentChildEdges(persons);
+  const childrenByParentId = {};
+  const parentsByChildId = {};
+  persons.forEach(p => {
+    childrenByParentId[p.id] = [];
+    parentsByChildId[p.id] = [];
+  });
+  parentChildEdges.forEach(edge => {
+    childrenByParentId[edge.parentId].push(edge.childId);
+    parentsByChildId[edge.childId].push(edge.parentId);
+  });
+
+  const levels = { [rootId]: 0 };
+  const queue = [rootId];
+  while (queue.length > 0) {
+    const currentId = queue.shift();
+    const currentLevel = levels[currentId];
+
+    (parentsByChildId[currentId] || []).forEach(parentId => {
+      const parentLevel = currentLevel - 1;
+      if (levels[parentId] === undefined || parentLevel < levels[parentId]) {
+        levels[parentId] = parentLevel;
+        queue.push(parentId);
+      }
+    });
+
+    (childrenByParentId[currentId] || []).forEach(childId => {
+      const childLevel = currentLevel + 1;
+      if (levels[childId] === undefined || childLevel > levels[childId]) {
+        levels[childId] = childLevel;
+        queue.push(childId);
+      }
+    });
+  }
+
+  let changed = true;
+  while (changed) {
+    changed = false;
+    (partnerships || []).forEach(pp => {
+      if (!personById[pp.person1Id] || !personById[pp.person2Id]) return;
+      const l1 = levels[pp.person1Id];
+      const l2 = levels[pp.person2Id];
+      if (l1 !== undefined && l2 === undefined) {
+        levels[pp.person2Id] = l1;
+        changed = true;
+      } else if (l2 !== undefined && l1 === undefined) {
+        levels[pp.person1Id] = l2;
+        changed = true;
+      }
+    });
+  }
 
   persons.forEach(p => {
-    (p.parents || []).forEach(pRef => {
-      if (!adjacency[p.id] || !adjacency[pRef.personId] || pRef.personId === p.id) return;
-      adjacency[p.id].add(pRef.personId);
-      adjacency[pRef.personId].add(p.id);
+    if (levels[p.id] === undefined) levels[p.id] = 0;
+  });
+
+  const levelValues = Array.from(new Set(Object.values(levels))).sort((a, b) => a - b);
+  const positionsById = {};
+  levelValues.forEach(level => {
+    const levelPersons = persons
+      .filter(p => levels[p.id] === level)
+      .slice()
+      .sort((a, b) => {
+        const ax = getAnchorX(a.id, positionsById, parentsByChildId, partnerships);
+        const bx = getAnchorX(b.id, positionsById, parentsByChildId, partnerships);
+        if (ax !== bx) return ax - bx;
+        return (a.name || '').localeCompare(b.name || '');
+      });
+    const startX = -((levelPersons.length - 1) * H_SEP) / 2;
+    levelPersons.forEach((person, idx) => {
+      positionsById[person.id] = { x: startX + idx * H_SEP, y: level * V_SEP };
     });
   });
 
-  if (!nodeMap[rootId]) return;
-  const visited = new Set([rootId]);
-  const queue = [rootId];
+  const nodes = persons.map(person => ({
+    person,
+    x: positionsById[person.id].x,
+    y: positionsById[person.id].y
+  }));
 
-  while (queue.length > 0) {
-    const currentId = queue.shift();
-    const neighbors = Array.from(adjacency[currentId] || []);
-    neighbors
-      .filter(id => !visited.has(id))
-      .sort((a, b) => {
-        const nameA = nodeMap[a]?.name || '';
-        const nameB = nodeMap[b]?.name || '';
-        return nameA.localeCompare(nameB);
-      })
-      .forEach(nextId => {
-        visited.add(nextId);
-        nodeMap[currentId].children.push(nodeMap[nextId]);
-        queue.push(nextId);
+  return { nodes, parentChildEdges };
+}
+
+function getAnchorX(personId, positionsById, parentsByChildId, partnerships) {
+  const anchors = [];
+  (parentsByChildId[personId] || []).forEach(parentId => {
+    const parentPos = positionsById[parentId];
+    if (parentPos) anchors.push(parentPos.x);
+  });
+  (partnerships || []).forEach(pp => {
+    const partnerId = pp.person1Id === personId ? pp.person2Id : (pp.person2Id === personId ? pp.person1Id : null);
+    if (!partnerId) return;
+    const partnerPos = positionsById[partnerId];
+    if (partnerPos) anchors.push(partnerPos.x);
+  });
+  if (anchors.length === 0) return 0;
+  return anchors.reduce((sum, x) => sum + x, 0) / anchors.length;
+}
+
+function getIncludedParentChildEdges(persons) {
+  const personById = {};
+  persons.forEach(p => { personById[p.id] = p; });
+  const edges = [];
+  persons.forEach(child => {
+    (child.parents || []).forEach(parentRef => {
+      if (!personById[parentRef.personId] || parentRef.personId === child.id) return;
+      edges.push({
+        parentId: parentRef.personId,
+        childId: child.id,
+        type: parentRef.type
       });
-  }
+    });
+  });
+  return edges;
 }
 
 function getParentChildRelation(personA, personB) {
