@@ -11,6 +11,9 @@
 const NODE_R = 36;   // circle radius
 const H_SEP  = 140;  // horizontal separation
 const V_SEP  = 160;  // vertical separation
+const PARTNER_ROW_PROXIMITY = 12;
+const MIN_PARTNER_DISTANCE_FACTOR = 0.8;
+const MAX_PARTNER_PLACEMENT_STEPS = 6;
 
 let _treeZoom = null;
 let _svg = null;
@@ -68,14 +71,20 @@ function renderTree() {
   const included = new Set();
   if (renderMode === 'ancestors') {
     collectAncestors(rootId, data, depth, 0, included);
+    const ancestorIds = Array.from(included);
+    collectChildrenOfAncestors(data, ancestorIds, included, 2);
   } else {
     collectDescendants(rootId, data, depth, 0, included);
   }
+  includeCurrentPartners(data, included);
 
   const persons   = data.persons.filter(p => included.has(p.id));
+  const personById = {};
+  persons.forEach(p => { personById[p.id] = p; });
   const partnerships = (data.partnerships || []).filter(
     pp => included.has(pp.person1Id) && included.has(pp.person2Id)
   );
+  const currentPartnerships = partnerships.filter(pp => isCurrentPartnership(pp, personById));
 
   // Build hierarchy: find root node (person with no parent inside included set)
   // We root at the chosen rootId
@@ -139,9 +148,12 @@ function renderTree() {
     .attr('d', linkGen);
 
   // Partnership links (horizontal)
-  const allNodes = root.descendants();
+  const treeNodes = root.descendants();
   const nodePositions = {};
-  allNodes.forEach(n => { nodePositions[n.data.id] = { x: n.x, y: n.y }; });
+  treeNodes.forEach(n => { nodePositions[n.data.id] = { x: n.x, y: n.y }; });
+  const partnerNodes = buildPartnerOnlyNodes(persons, treeNodes, currentPartnerships, nodePositions);
+  const allNodes = treeNodes.concat(partnerNodes.map(p => ({ data: p.person, x: p.x, y: p.y })));
+  partnerNodes.forEach(p => { nodePositions[p.person.id] = { x: p.x, y: p.y }; });
 
   partnerships.forEach(pp => {
     const pos1 = nodePositions[pp.person1Id];
@@ -241,6 +253,122 @@ function collectAncestors(personId, data, maxDepth, currentDepth, included) {
   (person.parents || []).forEach(pr => {
     collectAncestors(pr.personId, data, maxDepth, currentDepth + 1, included);
   });
+}
+
+function collectChildrenOfAncestors(data, ancestorIds, included, maxDescDepth) {
+  ancestorIds.forEach(ancestorId => {
+    collectDescendantsFromAncestor(ancestorId, data, maxDescDepth, 0, included);
+  });
+}
+
+function collectDescendantsFromAncestor(personId, data, maxDepth, currentDepth, included) {
+  if (currentDepth >= maxDepth) return;
+  const children = data.persons.filter(p =>
+    (p.parents || []).some(pr => pr.personId === personId)
+  );
+  children.forEach(child => {
+    included.add(child.id);
+    collectDescendantsFromAncestor(child.id, data, maxDepth, currentDepth + 1, included);
+  });
+}
+
+function includeCurrentPartners(data, included) {
+  const partnerships = data.partnerships || [];
+  const personById = {};
+  (data.persons || []).forEach(p => { personById[p.id] = p; });
+
+  let changed = true;
+  while (changed) {
+    changed = false;
+    partnerships.forEach(pp => {
+      if (!isCurrentPartnership(pp, personById)) return;
+      const in1 = included.has(pp.person1Id);
+      const in2 = included.has(pp.person2Id);
+      if (in1 && !in2) {
+        included.add(pp.person2Id);
+        changed = true;
+      } else if (in2 && !in1) {
+        included.add(pp.person1Id);
+        changed = true;
+      }
+    });
+  }
+}
+
+function isCurrentPartnership(partnership, personById) {
+  if (!partnership) return false;
+  if (partnership.type === 'divorced') return false;
+  if (partnership.endDate) return false;
+  const p1 = personById[partnership.person1Id];
+  const p2 = personById[partnership.person2Id];
+  if (!p1 || !p2) return false;
+  if (p1.deathDate || p2.deathDate) return false;
+  return true;
+}
+
+function buildPartnerOnlyNodes(persons, treeNodes, currentPartnerships, nodePositions) {
+  const treeNodeIds = new Set(treeNodes.map(n => n.data.id));
+  const partnerOnly = persons.filter(p => !treeNodeIds.has(p.id));
+  if (partnerOnly.length === 0) return [];
+
+  const pending = new Set(partnerOnly.map(p => p.id));
+  const personById = {};
+  persons.forEach(p => { personById[p.id] = p; });
+  const occupied = Object.values(nodePositions).map(pos => ({ x: pos.x, y: pos.y }));
+  const placed = [];
+
+  while (pending.size > 0) {
+    let progressed = false;
+    for (const personId of Array.from(pending)) {
+      const pp = currentPartnerships.find(r =>
+        (r.person1Id === personId && nodePositions[r.person2Id]) ||
+        (r.person2Id === personId && nodePositions[r.person1Id])
+      );
+      if (!pp) continue;
+
+      const anchorId = pp.person1Id === personId ? pp.person2Id : pp.person1Id;
+      const anchorPos = nodePositions[anchorId];
+      if (!anchorPos) continue;
+      const preferredDir = pp.person1Id === anchorId ? 1 : -1;
+      const pos = findPartnerNodePosition(anchorPos, preferredDir, occupied);
+
+      nodePositions[personId] = pos;
+      occupied.push(pos);
+      placed.push({ person: personById[personId], x: pos.x, y: pos.y });
+      pending.delete(personId);
+      progressed = true;
+    }
+    if (!progressed) break;
+  }
+
+  let fallbackOffset = 1;
+  pending.forEach(personId => {
+    const pos = { x: fallbackOffset * H_SEP, y: V_SEP };
+    fallbackOffset += 1;
+    nodePositions[personId] = pos;
+    placed.push({ person: personById[personId], x: pos.x, y: pos.y });
+  });
+
+  return placed;
+}
+
+function findPartnerNodePosition(anchorPos, preferredDir, occupied) {
+  const minDistance = H_SEP * MIN_PARTNER_DISTANCE_FACTOR;
+  const isOccupied = (x, y) => occupied.some(pos =>
+    Math.abs(pos.y - y) < PARTNER_ROW_PROXIMITY && Math.abs(pos.x - x) < minDistance
+  );
+
+  for (let step = 1; step <= MAX_PARTNER_PLACEMENT_STEPS; step++) {
+    const firstDir = preferredDir ?? 1;
+    const dirs = step === 1 ? [firstDir] : [firstDir, -firstDir];
+    for (const dir of dirs) {
+      const x = anchorPos.x + dir * H_SEP * step;
+      const y = anchorPos.y;
+      if (!isOccupied(x, y)) return { x, y };
+    }
+  }
+
+  return { x: anchorPos.x + (preferredDir ?? 1) * H_SEP, y: anchorPos.y };
 }
 
 function clearTree(msg) {
