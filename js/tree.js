@@ -398,13 +398,20 @@ function buildAncestorGraphLayout(rootId, persons, partnerships) {
     });
   }
 
-  const knownLevels = Object.values(levels);
-  const fallbackLevel = knownLevels.length > 0 ? (Math.max(...knownLevels) + 1) : 1;
+  let fallbackLevel = 1;
+  for (const personId in levels) {
+    const level = levels[personId];
+    if (level + 1 > fallbackLevel) fallbackLevel = level + 1;
+  }
   persons.forEach(p => {
     if (levels[p.id] === undefined) levels[p.id] = fallbackLevel;
   });
 
-  const levelValues = Array.from(new Set(Object.values(levels))).sort((a, b) => a - b);
+  const levelSet = new Set();
+  for (const personId in levels) {
+    levelSet.add(levels[personId]);
+  }
+  const levelValues = Array.from(levelSet).sort((a, b) => a - b);
   const positionsById = {};
   levelValues.forEach(level => {
     const levelPersons = persons
