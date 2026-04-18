@@ -149,8 +149,8 @@ function renderTree() {
   const treeNodes = root.descendants();
   const nodePositions = {};
   treeNodes.forEach(n => { nodePositions[n.data.id] = { x: n.x, y: n.y }; });
-  const partnerPlacementPartnerships = renderMode === 'ancestors' ? partnerships : currentPartnerships;
-  const partnerNodes = buildPartnerOnlyNodes(persons, treeNodes, partnerPlacementPartnerships, nodePositions);
+  const partnershipsForPlacement = renderMode === 'ancestors' ? partnerships : currentPartnerships;
+  const partnerNodes = buildPartnerOnlyNodes(persons, treeNodes, partnershipsForPlacement, nodePositions);
   const allNodes = treeNodes.concat(partnerNodes.map(p => ({ data: p.person, x: p.x, y: p.y })));
   partnerNodes.forEach(p => { nodePositions[p.person.id] = { x: p.x, y: p.y }; });
 
@@ -294,13 +294,13 @@ function includeCurrentPartners(data, included) {
   }
 }
 
-function includePartnersOfPersons(data, sourceIds, included, currentOnly) {
+function includePartnersOfPersons(data, sourceIds, included, currentPartnershipsOnly) {
   const partnerships = data.partnerships || [];
   const personById = {};
   (data.persons || []).forEach(p => { personById[p.id] = p; });
 
   partnerships.forEach(pp => {
-    if (currentOnly && !isCurrentPartnership(pp, personById)) return;
+    if (currentPartnershipsOnly && !isCurrentPartnership(pp, personById)) return;
     if (sourceIds.has(pp.person1Id)) included.add(pp.person2Id);
     if (sourceIds.has(pp.person2Id)) included.add(pp.person1Id);
   });
