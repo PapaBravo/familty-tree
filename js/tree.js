@@ -159,7 +159,7 @@ function renderTree() {
   } else {
     const linkGen = d3.linkVertical().x(d => d.x).y(d => d.y);
     g.selectAll('.link.parent-child')
-      .data(getTreeParentChildLinks(treeNodes))
+      .data(extractParentChildLinksFromTree(treeNodes))
       .join('path')
       .attr('class', d => {
         const rel = getParentChildRelation(d.source.data, d.target.data);
@@ -462,7 +462,7 @@ function getIncludedParentChildEdges(persons) {
   return edges;
 }
 
-function getTreeParentChildLinks(treeNodes) {
+function extractParentChildLinksFromTree(treeNodes) {
   return treeNodes
     .map(node => (node.parent ? { source: node.parent, target: node } : null))
     .filter(Boolean);
