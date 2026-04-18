@@ -69,14 +69,16 @@ function renderTree() {
 
   // Build subtree up to depth
   const included = new Set();
+  let ancestorIds = [];
   if (renderMode === 'ancestors') {
     collectAncestors(rootId, data, depth, 0, included);
-    const ancestorIds = Array.from(included);
+    ancestorIds = Array.from(included);
     collectChildrenOfAncestors(data, ancestorIds, included, 2);
+    includePartnersOfPersons(data, new Set(ancestorIds), included, false);
   } else {
     collectDescendants(rootId, data, depth, 0, included);
+    includeCurrentPartners(data, included);
   }
-  includeCurrentPartners(data, included);
 
   const persons   = data.persons.filter(p => included.has(p.id));
   const personById = {};
@@ -86,24 +88,22 @@ function renderTree() {
   );
   const currentPartnerships = partnerships.filter(pp => isCurrentPartnership(pp, personById));
 
-  // Build hierarchy: find root node (person with no parent inside included set)
-  // We root at the chosen rootId
+  // Build hierarchy rooted at selected person
   const nodeMap = {};
   persons.forEach(p => { nodeMap[p.id] = { ...p, children: [] }; });
 
-  persons.forEach(p => {
-    (p.parents || []).forEach(pRef => {
-      if (nodeMap[pRef.personId] && pRef.personId !== p.id) {
-        if (renderMode === 'ancestors') {
-          // child -> parent (inverted ancestry mode)
-          nodeMap[p.id].children.push(nodeMap[pRef.personId]);
-        } else {
+  if (renderMode === 'ancestors') {
+    buildConnectedAncestorHierarchy(rootId, persons, nodeMap);
+  } else {
+    persons.forEach(p => {
+      (p.parents || []).forEach(pRef => {
+        if (nodeMap[pRef.personId] && pRef.personId !== p.id) {
           // parent -> child (default descendants mode)
           nodeMap[pRef.personId].children.push(nodeMap[p.id]);
         }
-      }
+      });
     });
-  });
+  }
 
   const rootNode = nodeMap[rootId];
   if (!rootNode) { clearTree('Root not found'); return; }
@@ -139,10 +139,8 @@ function renderTree() {
     .data(root.links())
     .join('path')
     .attr('class', d => {
-      const childPerson = renderMode === 'ancestors' ? d.source.data : d.target.data;
-      const parentPerson = renderMode === 'ancestors' ? d.target.data : d.source.data;
-      const pRef = (childPerson.parents || []).find(r => r.personId === parentPerson.id);
-      const type = pRef ? pRef.type : 'parent-child';
+      const rel = getParentChildRelation(d.source.data, d.target.data);
+      const type = rel ? rel.type : 'parent-child';
       return `link ${type === 'adopted' ? 'adopted' : 'parent-child'}`;
     })
     .attr('d', linkGen);
@@ -151,7 +149,8 @@ function renderTree() {
   const treeNodes = root.descendants();
   const nodePositions = {};
   treeNodes.forEach(n => { nodePositions[n.data.id] = { x: n.x, y: n.y }; });
-  const partnerNodes = buildPartnerOnlyNodes(persons, treeNodes, currentPartnerships, nodePositions);
+  const partnershipsForPlacement = renderMode === 'ancestors' ? partnerships : currentPartnerships;
+  const partnerNodes = buildPartnerOnlyNodes(persons, treeNodes, partnershipsForPlacement, nodePositions);
   const allNodes = treeNodes.concat(partnerNodes.map(p => ({ data: p.person, x: p.x, y: p.y })));
   partnerNodes.forEach(p => { nodePositions[p.person.id] = { x: p.x, y: p.y }; });
 
@@ -295,6 +294,18 @@ function includeCurrentPartners(data, included) {
   }
 }
 
+function includePartnersOfPersons(data, sourceIds, included, currentPartnershipsOnly) {
+  const partnerships = data.partnerships || [];
+  const personById = {};
+  (data.persons || []).forEach(p => { personById[p.id] = p; });
+
+  partnerships.forEach(pp => {
+    if (currentPartnershipsOnly && !isCurrentPartnership(pp, personById)) return;
+    if (sourceIds.has(pp.person1Id)) included.add(pp.person2Id);
+    if (sourceIds.has(pp.person2Id)) included.add(pp.person1Id);
+  });
+}
+
 function isCurrentPartnership(partnership, personById) {
   if (!partnership) return false;
   if (partnership.type === 'divorced') return false;
@@ -304,6 +315,49 @@ function isCurrentPartnership(partnership, personById) {
   if (!p1 || !p2) return false;
   if (p1.deathDate || p2.deathDate) return false;
   return true;
+}
+
+function buildConnectedAncestorHierarchy(rootId, persons, nodeMap) {
+  const adjacency = {};
+  persons.forEach(p => { adjacency[p.id] = new Set(); });
+
+  persons.forEach(p => {
+    (p.parents || []).forEach(pRef => {
+      if (!adjacency[p.id] || !adjacency[pRef.personId] || pRef.personId === p.id) return;
+      adjacency[p.id].add(pRef.personId);
+      adjacency[pRef.personId].add(p.id);
+    });
+  });
+
+  if (!nodeMap[rootId]) return;
+  const visited = new Set([rootId]);
+  const queue = [rootId];
+
+  while (queue.length > 0) {
+    const currentId = queue.shift();
+    const neighbors = Array.from(adjacency[currentId] || []);
+    neighbors
+      .filter(id => !visited.has(id))
+      .sort((a, b) => {
+        const nameA = nodeMap[a]?.name || '';
+        const nameB = nodeMap[b]?.name || '';
+        return nameA.localeCompare(nameB);
+      })
+      .forEach(nextId => {
+        visited.add(nextId);
+        nodeMap[currentId].children.push(nodeMap[nextId]);
+        queue.push(nextId);
+      });
+  }
+}
+
+function getParentChildRelation(personA, personB) {
+  if (!personA || !personB) return null;
+  const aToB = (personA.parents || []).find(r => r.personId === personB.id);
+  if (aToB) return { child: personA, parent: personB, type: aToB.type };
+  const bToA = (personB.parents || []).find(r => r.personId === personA.id);
+  if (bToA) return { child: personB, parent: personA, type: bToA.type };
+  return null;
 }
 
 function buildPartnerOnlyNodes(persons, treeNodes, currentPartnerships, nodePositions) {
