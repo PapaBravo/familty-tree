@@ -359,7 +359,7 @@ function findPartnerNodePosition(anchorPos, preferredDir, occupied) {
   );
 
   for (let step = 1; step <= MAX_PARTNER_PLACEMENT_STEPS; step++) {
-    const firstDir = preferredDir || 1;
+    const firstDir = preferredDir ?? 1;
     const dirs = step === 1 ? [firstDir] : [firstDir, -firstDir];
     for (const dir of dirs) {
       const x = anchorPos.x + dir * H_SEP * step;
@@ -368,7 +368,7 @@ function findPartnerNodePosition(anchorPos, preferredDir, occupied) {
     }
   }
 
-  return { x: anchorPos.x + (preferredDir || 1) * H_SEP, y: anchorPos.y };
+  return { x: anchorPos.x + (preferredDir ?? 1) * H_SEP, y: anchorPos.y };
 }
 
 function clearTree(msg) {
