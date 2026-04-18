@@ -382,8 +382,11 @@ function buildAncestorGraphLayout(rootId, persons, partnerships) {
   }
 
   let changed = true;
-  while (changed) {
+  let iteration = 0;
+  const maxIterations = persons.length || 1;
+  while (changed && iteration < maxIterations) {
     changed = false;
+    iteration += 1;
     (partnerships || []).forEach(pp => {
       if (!personById[pp.person1Id] || !personById[pp.person2Id]) return;
       const l1 = levels[pp.person1Id];
@@ -398,13 +401,13 @@ function buildAncestorGraphLayout(rootId, persons, partnerships) {
     });
   }
 
-  let fallbackLevel = 1;
+  let nextAvailableLevel = 1;
   for (const personId in levels) {
     const level = levels[personId];
-    if (level + 1 > fallbackLevel) fallbackLevel = level + 1;
+    if (level + 1 > nextAvailableLevel) nextAvailableLevel = level + 1;
   }
   persons.forEach(p => {
-    if (levels[p.id] === undefined) levels[p.id] = fallbackLevel;
+    if (levels[p.id] === undefined) levels[p.id] = nextAvailableLevel;
   });
 
   const levelSet = new Set();
