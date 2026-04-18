@@ -12,6 +12,8 @@ const NODE_R = 36;   // circle radius
 const H_SEP  = 140;  // horizontal separation
 const V_SEP  = 160;  // vertical separation
 const PARTNER_ROW_PROXIMITY = 12;
+const MIN_PARTNER_DISTANCE_FACTOR = 0.8;
+const MAX_PARTNER_PLACEMENT_STEPS = 6;
 
 let _treeZoom = null;
 let _svg = null;
@@ -69,7 +71,8 @@ function renderTree() {
   const included = new Set();
   if (renderMode === 'ancestors') {
     collectAncestors(rootId, data, depth, 0, included);
-    collectChildrenOfAncestors(data, included, 2);
+    const ancestorIds = Array.from(included);
+    collectChildrenOfAncestors(data, ancestorIds, included, 2);
   } else {
     collectDescendants(rootId, data, depth, 0, included);
   }
@@ -252,10 +255,9 @@ function collectAncestors(personId, data, maxDepth, currentDepth, included) {
   });
 }
 
-function collectChildrenOfAncestors(data, ancestorsIncluded, maxDescDepth) {
-  const ancestorIds = Array.from(ancestorsIncluded);
+function collectChildrenOfAncestors(data, ancestorIds, included, maxDescDepth) {
   ancestorIds.forEach(ancestorId => {
-    collectDescendantsFromAncestor(ancestorId, data, maxDescDepth, 0, ancestorsIncluded);
+    collectDescendantsFromAncestor(ancestorId, data, maxDescDepth, 0, included);
   });
 }
 
@@ -351,12 +353,12 @@ function buildPartnerOnlyNodes(persons, treeNodes, currentPartnerships, nodePosi
 }
 
 function findPartnerNodePosition(anchorPos, preferredDir, occupied) {
-  const minDistance = H_SEP * 0.8;
+  const minDistance = H_SEP * MIN_PARTNER_DISTANCE_FACTOR;
   const isOccupied = (x, y) => occupied.some(pos =>
     Math.abs(pos.y - y) < PARTNER_ROW_PROXIMITY && Math.abs(pos.x - x) < minDistance
   );
 
-  for (let step = 1; step <= 6; step++) {
+  for (let step = 1; step <= MAX_PARTNER_PLACEMENT_STEPS; step++) {
     const firstDir = preferredDir || 1;
     const dirs = step === 1 ? [firstDir] : [firstDir, -firstDir];
     for (const dir of dirs) {
