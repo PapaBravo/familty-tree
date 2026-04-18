@@ -358,57 +358,7 @@ function buildAncestorGraphLayout(rootId, persons, partnerships) {
     parentsByChildId[edge.childId].push(edge.parentId);
   });
 
-  const levels = { [rootId]: 0 };
-  const queue = [rootId];
-  while (queue.length > 0) {
-    const currentId = queue.shift();
-    const currentLevel = levels[currentId];
-
-    (parentsByChildId[currentId] || []).forEach(parentId => {
-      const parentLevel = currentLevel - 1;
-      if (levels[parentId] === undefined) {
-        levels[parentId] = parentLevel;
-        queue.push(parentId);
-      }
-    });
-
-    (childrenByParentId[currentId] || []).forEach(childId => {
-      const childLevel = currentLevel + 1;
-      if (levels[childId] === undefined) {
-        levels[childId] = childLevel;
-        queue.push(childId);
-      }
-    });
-  }
-
-  let changed = true;
-  let iteration = 0;
-  const maxIterations = persons.length || 1;
-  while (changed && iteration < maxIterations) {
-    changed = false;
-    iteration += 1;
-    (partnerships || []).forEach(pp => {
-      if (!personById[pp.person1Id] || !personById[pp.person2Id]) return;
-      const l1 = levels[pp.person1Id];
-      const l2 = levels[pp.person2Id];
-      if (l1 !== undefined && l2 === undefined) {
-        levels[pp.person2Id] = l1;
-        changed = true;
-      } else if (l2 !== undefined && l1 === undefined) {
-        levels[pp.person1Id] = l2;
-        changed = true;
-      }
-    });
-  }
-
-  let nextAvailableLevel = 1;
-  for (const personId in levels) {
-    const level = levels[personId];
-    if (level + 1 > nextAvailableLevel) nextAvailableLevel = level + 1;
-  }
-  persons.forEach(p => {
-    if (levels[p.id] === undefined) levels[p.id] = nextAvailableLevel;
-  });
+  const levels = buildAncestorLevels(rootId, persons, partnerships, parentChildEdges);
 
   const levelSet = new Set();
   for (const personId in levels) {
@@ -439,6 +389,146 @@ function buildAncestorGraphLayout(rootId, persons, partnerships) {
   }));
 
   return { nodes, parentChildEdges };
+}
+
+function buildAncestorLevels(rootId, persons, partnerships, parentChildEdges) {
+  const personIds = persons.map(p => p.id);
+  const dsu = createDisjointSet(personIds);
+  const personIdSet = new Set(personIds);
+
+  // Keep partners on the same generation level.
+  (partnerships || []).forEach(pp => {
+    if (!personIdSet.has(pp.person1Id) || !personIdSet.has(pp.person2Id)) return;
+    dsu.union(pp.person1Id, pp.person2Id);
+  });
+
+  // Keep siblings (children of the same parent) on the same generation level.
+  const childIdsByParentId = {};
+  parentChildEdges.forEach(edge => {
+    if (!childIdsByParentId[edge.parentId]) childIdsByParentId[edge.parentId] = [];
+    childIdsByParentId[edge.parentId].push(edge.childId);
+  });
+  Object.values(childIdsByParentId).forEach(childIds => {
+    if (childIds.length < 2) return;
+    const firstChildId = childIds[0];
+    childIds.slice(1).forEach(childId => dsu.union(firstChildId, childId));
+  });
+
+  const componentByPersonId = {};
+  persons.forEach(p => { componentByPersonId[p.id] = dsu.find(p.id); });
+  const componentIds = Array.from(new Set(Object.values(componentByPersonId)));
+
+  const childComponentsByParentComponent = {};
+  const indegreeByComponent = {};
+  const levelByComponent = {};
+  componentIds.forEach(componentId => {
+    childComponentsByParentComponent[componentId] = new Set();
+    indegreeByComponent[componentId] = 0;
+    levelByComponent[componentId] = 0;
+  });
+
+  parentChildEdges.forEach(edge => {
+    const parentComponentId = componentByPersonId[edge.parentId];
+    const childComponentId = componentByPersonId[edge.childId];
+    if (!parentComponentId || !childComponentId || parentComponentId === childComponentId) return;
+    const children = childComponentsByParentComponent[parentComponentId];
+    if (children.has(childComponentId)) return;
+    children.add(childComponentId);
+    indegreeByComponent[childComponentId] += 1;
+  });
+
+  const queue = componentIds.filter(componentId => indegreeByComponent[componentId] === 0);
+  const topoOrder = [];
+  while (queue.length > 0) {
+    const componentId = queue.shift();
+    topoOrder.push(componentId);
+    childComponentsByParentComponent[componentId].forEach(childComponentId => {
+      indegreeByComponent[childComponentId] -= 1;
+      if (indegreeByComponent[childComponentId] === 0) queue.push(childComponentId);
+    });
+  }
+
+  if (topoOrder.length === componentIds.length) {
+    topoOrder.forEach(componentId => {
+      childComponentsByParentComponent[componentId].forEach(childComponentId => {
+        relaxChildComponentLevel(levelByComponent, componentId, childComponentId);
+      });
+    });
+  } else {
+    // Fallback for malformed cyclical data.
+    let changed = true;
+    let iteration = 0;
+    const maxIterations = componentIds.length || 1;
+    while (changed && iteration < maxIterations) {
+      changed = false;
+      iteration += 1;
+      componentIds.forEach(componentId => {
+        childComponentsByParentComponent[componentId].forEach(childComponentId => {
+          const didChange = relaxChildComponentLevel(levelByComponent, componentId, childComponentId);
+          if (didChange) changed = true;
+        });
+      });
+    }
+  }
+
+  const levels = {};
+  persons.forEach(p => {
+    levels[p.id] = levelByComponent[componentByPersonId[p.id]];
+  });
+
+  const rootLevel = levels[rootId] !== undefined ? levels[rootId] : 0;
+  persons.forEach(p => {
+    levels[p.id] -= rootLevel;
+  });
+
+  return levels;
+}
+
+function relaxChildComponentLevel(levelByComponent, parentComponentId, childComponentId) {
+  const expected = levelByComponent[parentComponentId] + 1;
+  if (levelByComponent[childComponentId] < expected) {
+    levelByComponent[childComponentId] = expected;
+    return true;
+  }
+  return false;
+}
+
+function createDisjointSet(ids) {
+  const parent = {};
+  const rank = {};
+
+  ids.forEach(id => {
+    parent[id] = id;
+    rank[id] = 0;
+  });
+
+  function find(id) {
+    let root = id;
+    while (parent[root] !== root) root = parent[root];
+    let current = id;
+    while (parent[current] !== current) {
+      const next = parent[current];
+      parent[current] = root;
+      current = next;
+    }
+    return root;
+  }
+
+  function union(a, b) {
+    const rootA = find(a);
+    const rootB = find(b);
+    if (rootA === rootB) return;
+    if (rank[rootA] < rank[rootB]) {
+      parent[rootA] = rootB;
+    } else if (rank[rootA] > rank[rootB]) {
+      parent[rootB] = rootA;
+    } else {
+      parent[rootB] = rootA;
+      rank[rootA] += 1;
+    }
+  }
+
+  return { find, union };
 }
 
 function getAnchorX(personId, positionsById, parentsByChildId, partnerships) {
