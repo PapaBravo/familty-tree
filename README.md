@@ -6,7 +6,7 @@ All data is stored in your browser's localStorage — no server, no account requ
 ## Features
 
 - **List view** with full-text search
-- **Tree view** rendered with D3 — select any root person and depth
+- **Tree view** rendered with D3 — select any root person, depth, and mode (descendants or inverted ancestors)
 - **Multiple families** — create, import, export, and delete family datasets
 - **Person editing** — add/edit names, dates, descriptions, photos, and parent relations
 - **JSON import/export** for data portability
