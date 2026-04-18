@@ -451,10 +451,7 @@ function buildAncestorLevels(rootId, persons, partnerships, parentChildEdges) {
   if (topoOrder.length === componentIds.length) {
     topoOrder.forEach(componentId => {
       childComponentsByParentComponent[componentId].forEach(childComponentId => {
-        const expected = levelByComponent[componentId] + 1;
-        if (levelByComponent[childComponentId] < expected) {
-          levelByComponent[childComponentId] = expected;
-        }
+        relaxChildComponentLevel(levelByComponent, componentId, childComponentId);
       });
     });
   } else {
@@ -467,11 +464,8 @@ function buildAncestorLevels(rootId, persons, partnerships, parentChildEdges) {
       iteration += 1;
       componentIds.forEach(componentId => {
         childComponentsByParentComponent[componentId].forEach(childComponentId => {
-          const expected = levelByComponent[componentId] + 1;
-          if (levelByComponent[childComponentId] < expected) {
-            levelByComponent[childComponentId] = expected;
-            changed = true;
-          }
+          const didChange = relaxChildComponentLevel(levelByComponent, componentId, childComponentId);
+          if (didChange) changed = true;
         });
       });
     }
@@ -482,12 +476,21 @@ function buildAncestorLevels(rootId, persons, partnerships, parentChildEdges) {
     levels[p.id] = levelByComponent[componentByPersonId[p.id]];
   });
 
-  const rootLevel = levels[rootId] || 0;
+  const rootLevel = levels[rootId] !== undefined ? levels[rootId] : 0;
   persons.forEach(p => {
     levels[p.id] -= rootLevel;
   });
 
   return levels;
+}
+
+function relaxChildComponentLevel(levelByComponent, parentComponentId, childComponentId) {
+  const expected = levelByComponent[parentComponentId] + 1;
+  if (levelByComponent[childComponentId] < expected) {
+    levelByComponent[childComponentId] = expected;
+    return true;
+  }
+  return false;
 }
 
 function createDisjointSet(ids) {
@@ -500,8 +503,15 @@ function createDisjointSet(ids) {
   });
 
   function find(id) {
-    if (parent[id] !== id) parent[id] = find(parent[id]);
-    return parent[id];
+    let root = id;
+    while (parent[root] !== root) root = parent[root];
+    let current = id;
+    while (parent[current] !== current) {
+      const next = parent[current];
+      parent[current] = root;
+      current = next;
+    }
+    return root;
   }
 
   function union(a, b) {
