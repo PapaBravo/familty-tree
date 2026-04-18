@@ -192,10 +192,10 @@ D3 v7 hierarchical tree renderer.
 
 1. Read the selected root person, depth, and mode from the controls.
 2. For `descendants` mode, `collectDescendants()` walks the child graph up to `maxDepth`.
-3. For `ancestors` mode, `collectAncestors()` walks the parent graph up to `maxDepth` and builds an inverted tree (child at top, parents below).
-4. Build a tree-compatible object graph: each node gets a `children` array.
-5. Deduplicate: prevent the same node appearing twice (handles DAGs).
-6. Pass the root to `d3.hierarchy()` then `d3.tree()` with `nodeSize`.
+3. For `ancestors` mode, `collectAncestors()` walks the parent graph up to `maxDepth`, includes children of those ancestors, and renders a generation-layered graph layout (not a strict tree) so siblings stay on the same row.
+4. For `descendants` mode, build a tree-compatible object graph where each node gets a `children` array.
+5. For `descendants` mode, deduplicate: prevent the same node appearing twice (handles DAGs).
+6. For `descendants` mode, pass the root to `d3.hierarchy()` then `d3.tree()` with `nodeSize`.
 7. Draw:
    ** Parent-child links as `d3.linkVertical()` paths.
    ** Partnership links as quadratic Bézier curves coloured by type.
