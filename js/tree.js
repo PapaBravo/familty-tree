@@ -56,6 +56,8 @@ function renderTree() {
 
   const rootId = document.getElementById('root-select').value;
   const depth  = parseInt(document.getElementById('depth-input').value, 10) || 3;
+  const modeSelect = document.getElementById('tree-mode-select');
+  const renderMode = modeSelect ? modeSelect.value : 'descendants';
 
   if (!rootId) {
     clearTree('Select a root person');
@@ -64,7 +66,11 @@ function renderTree() {
 
   // Build subtree up to depth
   const included = new Set();
-  collectDescendants(rootId, data, depth, 0, included);
+  if (renderMode === 'ancestors') {
+    collectAncestors(rootId, data, depth, 0, included);
+  } else {
+    collectDescendants(rootId, data, depth, 0, included);
+  }
 
   const persons   = data.persons.filter(p => included.has(p.id));
   const partnerships = (data.partnerships || []).filter(
@@ -79,8 +85,13 @@ function renderTree() {
   persons.forEach(p => {
     (p.parents || []).forEach(pRef => {
       if (nodeMap[pRef.personId] && pRef.personId !== p.id) {
-        // parent -> child
-        nodeMap[pRef.personId].children.push(nodeMap[p.id]);
+        if (renderMode === 'ancestors') {
+          // child -> parent (inverted ancestry mode)
+          nodeMap[p.id].children.push(nodeMap[pRef.personId]);
+        } else {
+          // parent -> child (default descendants mode)
+          nodeMap[pRef.personId].children.push(nodeMap[p.id]);
+        }
       }
     });
   });
@@ -119,8 +130,8 @@ function renderTree() {
     .data(root.links())
     .join('path')
     .attr('class', d => {
-      const childPerson = d.target.data;
-      const parentPerson = d.source.data;
+      const childPerson = renderMode === 'ancestors' ? d.source.data : d.target.data;
+      const parentPerson = renderMode === 'ancestors' ? d.target.data : d.source.data;
       const pRef = (childPerson.parents || []).find(r => r.personId === parentPerson.id);
       const type = pRef ? pRef.type : 'parent-child';
       return `link ${type === 'adopted' ? 'adopted' : 'parent-child'}`;
@@ -218,6 +229,18 @@ function collectDescendants(personId, data, maxDepth, currentDepth, included) {
     (p.parents || []).some(pr => pr.personId === personId)
   );
   children.forEach(child => collectDescendants(child.id, data, maxDepth, currentDepth + 1, included));
+}
+
+function collectAncestors(personId, data, maxDepth, currentDepth, included) {
+  if (currentDepth > maxDepth) return;
+  if (included.has(personId)) return;
+  included.add(personId);
+
+  const person = data.persons.find(p => p.id === personId);
+  if (!person) return;
+  (person.parents || []).forEach(pr => {
+    collectAncestors(pr.personId, data, maxDepth, currentDepth + 1, included);
+  });
 }
 
 function clearTree(msg) {

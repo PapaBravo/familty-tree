@@ -51,6 +51,11 @@
       <div id="tree-controls">
         <label for="root-select">Root:</label>
         <select id="root-select" title="Select root person for the tree"></select>
+        <label for="tree-mode-select">Mode:</label>
+        <select id="tree-mode-select" title="Select tree rendering mode">
+          <option value="descendants">Descendants</option>
+          <option value="ancestors">Ancestors (inverted)</option>
+        </select>
         <label for="depth-input">Depth:</label>
         <input id="depth-input" type="number" value="3" min="1" max="10" />
         <button id="render-btn">Render Tree</button>

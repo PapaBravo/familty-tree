@@ -190,16 +190,17 @@ D3 v7 hierarchical tree renderer.
 
 ==== Algorithm
 
-1. Read the selected root person and depth from the controls.
-2. `collectDescendants()` walks the child graph up to `maxDepth` using a `Set` to avoid revisiting nodes.
-3. Build a tree-compatible object graph: each node gets a `children` array.
-4. Deduplicate: prevent the same node appearing twice (handles DAGs).
-5. Pass the root to `d3.hierarchy()` then `d3.tree()` with `nodeSize`.
-6. Draw:
+1. Read the selected root person, depth, and mode from the controls.
+2. For `descendants` mode, `collectDescendants()` walks the child graph up to `maxDepth`.
+3. For `ancestors` mode, `collectAncestors()` walks the parent graph up to `maxDepth` and builds an inverted tree (child at top, parents below).
+4. Build a tree-compatible object graph: each node gets a `children` array.
+5. Deduplicate: prevent the same node appearing twice (handles DAGs).
+6. Pass the root to `d3.hierarchy()` then `d3.tree()` with `nodeSize`.
+7. Draw:
    ** Parent-child links as `d3.linkVertical()` paths.
    ** Partnership links as quadratic Bézier curves coloured by type.
    ** Nodes as `<circle>` + optional `<image>` (with `<clipPath>`) + text labels.
-7. Fit the resulting bounding box to the viewport via `d3.zoomIdentity`.
+8. Fit the resulting bounding box to the viewport via `d3.zoomIdentity`.
 
 ==== Visual Design
 
@@ -280,7 +281,6 @@ Using a local HTTP server avoids this.
 
 == Future Improvements
 
-* **Ancestry view**: Show ancestors (parents, grandparents) rather than descendants.
 * **Partnership management UI**: Add/edit partnerships from the application without manually importing JSON.
 * **Timeline view**: Chronological life event display.
 * **PWA / Service Worker**: Offline support and installability.
