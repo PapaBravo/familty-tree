@@ -67,7 +67,16 @@ function renderTree() {
     return;
   }
 
-  // Build subtree up to depth
+  const graph = buildRenderGraph(data, rootId, depth, renderMode);
+  if (graph.error) {
+    clearTree(graph.error);
+    return;
+  }
+
+  drawRenderGraph(graph);
+}
+
+function buildRenderGraph(data, rootId, depth, renderMode) {
   const included = new Set();
   let ancestorIds = [];
   if (renderMode === 'ancestors') {
@@ -80,7 +89,7 @@ function renderTree() {
     includeCurrentPartners(data, included);
   }
 
-  const persons   = data.persons.filter(p => included.has(p.id));
+  const persons = data.persons.filter(p => included.has(p.id));
   const personById = {};
   persons.forEach(p => { personById[p.id] = p; });
   const partnerships = (data.partnerships || []).filter(
@@ -88,65 +97,98 @@ function renderTree() {
   );
   const currentPartnerships = partnerships.filter(pp => isCurrentPartnership(pp, personById));
 
-  let allNodes = [];
-  let nodePositions = {};
-  let parentChildEdges = [];
-  let treeNodes = [];
-  let treeParentChildLinks = [];
-
   if (renderMode === 'ancestors') {
     const graphLayout = buildAncestorGraphLayout(rootId, persons, partnerships);
-    if (!graphLayout) { clearTree('Root not found'); return; }
-    parentChildEdges = graphLayout.parentChildEdges;
-    allNodes = graphLayout.nodes.map(n => ({ data: n.person, x: n.x, y: n.y }));
+    if (!graphLayout) return { error: 'Root not found' };
+
+    const nodePositions = {};
+    const allNodes = graphLayout.nodes.map(n => ({ data: n.person, x: n.x, y: n.y }));
     allNodes.forEach(n => { nodePositions[n.data.id] = { x: n.x, y: n.y }; });
-  } else {
-    // Build hierarchy rooted at selected person
-    const nodeMap = {};
-    persons.forEach(p => { nodeMap[p.id] = { ...p, children: [] }; });
-
-    persons.forEach(p => {
-      (p.parents || []).forEach(pRef => {
-        if (nodeMap[pRef.personId] && pRef.personId !== p.id) {
-          // parent -> child (default descendants mode)
-          nodeMap[pRef.personId].children.push(nodeMap[p.id]);
-        }
-      });
-    });
-
-    const rootNode = nodeMap[rootId];
-    if (!rootNode) { clearTree('Root not found'); return; }
-
-    // Remove circular references for d3 hierarchy (deduplicate children)
-    const seen = new Set();
-    function dedupe(node) {
-      if (seen.has(node.id)) { return null; }
-      seen.add(node.id);
-      node.children = node.children.map(dedupe).filter(Boolean);
-      return node;
-    }
-    dedupe(rootNode);
-
-    const root = d3.hierarchy(rootNode);
-    const treeLayout = d3.tree()
-      .nodeSize([H_SEP, V_SEP])
-      .separation((a, b) => (a.parent === b.parent ? 1.2 : 1.6));
-
-    treeLayout(root);
-    treeNodes = root.descendants();
-    treeParentChildLinks = root.links();
-    treeNodes.forEach(n => { nodePositions[n.data.id] = { x: n.x, y: n.y }; });
+    return {
+      renderMode,
+      allNodes,
+      nodePositions,
+      parentChildEdges: graphLayout.parentChildEdges,
+      treeParentChildLinks: [],
+      partnerships
+    };
   }
 
-  // Draw
+  const descendantsLayout = buildDescendantsLayout(rootId, persons);
+  if (!descendantsLayout) return { error: 'Root not found' };
+
+  const nodePositions = { ...descendantsLayout.nodePositions };
+  const partnerNodes = buildPartnerOnlyNodes(
+    persons,
+    descendantsLayout.treeNodes,
+    currentPartnerships,
+    nodePositions
+  );
+
+  return {
+    renderMode,
+    allNodes: descendantsLayout.treeNodes.concat(partnerNodes.map(p => ({ data: p.person, x: p.x, y: p.y }))),
+    nodePositions,
+    parentChildEdges: [],
+    treeParentChildLinks: descendantsLayout.treeParentChildLinks,
+    partnerships
+  };
+}
+
+function buildDescendantsLayout(rootId, persons) {
+  const nodeMap = {};
+  persons.forEach(p => { nodeMap[p.id] = { ...p, children: [] }; });
+
+  persons.forEach(p => {
+    (p.parents || []).forEach(pRef => {
+      if (nodeMap[pRef.personId] && pRef.personId !== p.id) {
+        nodeMap[pRef.personId].children.push(nodeMap[p.id]);
+      }
+    });
+  });
+
+  const rootNode = nodeMap[rootId];
+  if (!rootNode) return null;
+
+  const seen = new Set();
+  function dedupe(node) {
+    if (seen.has(node.id)) return null;
+    seen.add(node.id);
+    node.children = node.children.map(dedupe).filter(Boolean);
+    return node;
+  }
+  dedupe(rootNode);
+
+  const root = d3.hierarchy(rootNode);
+  const treeLayout = d3.tree()
+    .nodeSize([H_SEP, V_SEP])
+    .separation((a, b) => (a.parent === b.parent ? 1.2 : 1.6));
+
+  treeLayout(root);
+  const treeNodes = root.descendants();
+  const nodePositions = {};
+  treeNodes.forEach(n => { nodePositions[n.data.id] = { x: n.x, y: n.y }; });
+
+  return { treeNodes, treeParentChildLinks: root.links(), nodePositions };
+}
+
+function drawRenderGraph(graph) {
+  const {
+    renderMode,
+    allNodes,
+    nodePositions,
+    parentChildEdges,
+    treeParentChildLinks,
+    partnerships
+  } = graph;
+
   const g = _svg.select('#tree-g');
   g.selectAll('*').remove();
 
   const svgEl = document.getElementById('tree-svg');
-  const W = svgEl.clientWidth  || 800;
+  const W = svgEl.clientWidth || 800;
   const H = svgEl.clientHeight || 600;
 
-  // Parent-child links
   if (renderMode === 'ancestors') {
     g.selectAll('.link.parent-child')
       .data(parentChildEdges)
@@ -171,13 +213,6 @@ function renderTree() {
       .attr('d', linkGen);
   }
 
-  // Partnership links (horizontal)
-  if (renderMode !== 'ancestors') {
-    const partnerNodes = buildPartnerOnlyNodes(persons, treeNodes, currentPartnerships, nodePositions);
-    allNodes = treeNodes.concat(partnerNodes.map(p => ({ data: p.person, x: p.x, y: p.y })));
-    partnerNodes.forEach(p => { nodePositions[p.person.id] = { x: p.x, y: p.y }; });
-  }
-
   partnerships.forEach(pp => {
     const pos1 = nodePositions[pp.person1Id];
     const pos2 = nodePositions[pp.person2Id];
@@ -189,7 +224,6 @@ function renderTree() {
       .attr('d', `M${pos1.x},${pos1.y} Q${mx},${my - 30} ${pos2.x},${pos2.y}`);
   });
 
-  // Nodes
   const nodeGroups = g.selectAll('.node')
     .data(allNodes)
     .join('g')
@@ -201,11 +235,9 @@ function renderTree() {
       showPersonDetail(d.data.id);
     });
 
-  // Circle background
   nodeGroups.append('circle')
     .attr('r', NODE_R);
 
-  // Image clip path
   const defs = _svg.append('defs');
   allNodes.forEach((n, i) => {
     defs.append('clipPath')
@@ -214,7 +246,6 @@ function renderTree() {
       .attr('r', NODE_R);
   });
 
-  // Images
   allNodes.forEach((n, i) => {
     const safeUrl = sanitizeImageUrl(n.data.image);
     if (safeUrl) {
@@ -229,13 +260,11 @@ function renderTree() {
     }
   });
 
-  // Name label
   nodeGroups.append('text')
     .attr('y', NODE_R + 16)
     .attr('text-anchor', 'middle')
     .text(d => truncate(d.data.name || '—', 20));
 
-  // Birth / death dates
   nodeGroups.append('text')
     .attr('class', 'date-text')
     .attr('y', NODE_R + 30)
@@ -247,10 +276,9 @@ function renderTree() {
       return parts.join(' – ');
     });
 
-  // Fit tree to viewport
   const bounds = g.node().getBBox();
-  const scale  = Math.min(0.9 * W / bounds.width, 0.9 * H / bounds.height, 1.5);
-  const tx = W / 2 - scale * (bounds.x + bounds.width  / 2);
+  const scale = Math.min(0.9 * W / bounds.width, 0.9 * H / bounds.height, 1.5);
+  const tx = W / 2 - scale * (bounds.x + bounds.width / 2);
   const ty = H / 2 - scale * (bounds.y + bounds.height / 2);
   _svg.call(_treeZoom.transform, d3.zoomIdentity.translate(tx, ty).scale(scale));
 }
