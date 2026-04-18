@@ -11,6 +11,7 @@
 const NODE_R = 36;   // circle radius
 const H_SEP  = 140;  // horizontal separation
 const V_SEP  = 160;  // vertical separation
+const PARTNER_ROW_PROXIMITY = 12;
 
 let _treeZoom = null;
 let _svg = null;
@@ -149,7 +150,7 @@ function renderTree() {
   treeNodes.forEach(n => { nodePositions[n.data.id] = { x: n.x, y: n.y }; });
   const partnerNodes = buildPartnerOnlyNodes(persons, treeNodes, currentPartnerships, nodePositions);
   const allNodes = treeNodes.concat(partnerNodes.map(p => ({ data: p.person, x: p.x, y: p.y })));
-  allNodes.forEach(n => { nodePositions[n.data.id] = { x: n.x, y: n.y }; });
+  partnerNodes.forEach(p => { nodePositions[p.person.id] = { x: p.x, y: p.y }; });
 
   partnerships.forEach(pp => {
     const pos1 = nodePositions[pp.person1Id];
@@ -342,6 +343,7 @@ function buildPartnerOnlyNodes(persons, treeNodes, currentPartnerships, nodePosi
   pending.forEach(personId => {
     const pos = { x: fallbackOffset * H_SEP, y: V_SEP };
     fallbackOffset += 1;
+    nodePositions[personId] = pos;
     placed.push({ person: personById[personId], x: pos.x, y: pos.y });
   });
 
@@ -351,7 +353,7 @@ function buildPartnerOnlyNodes(persons, treeNodes, currentPartnerships, nodePosi
 function findPartnerNodePosition(anchorPos, preferredDir, occupied) {
   const minDistance = H_SEP * 0.8;
   const isOccupied = (x, y) => occupied.some(pos =>
-    Math.abs(pos.y - y) < 12 && Math.abs(pos.x - x) < minDistance
+    Math.abs(pos.y - y) < PARTNER_ROW_PROXIMITY && Math.abs(pos.x - x) < minDistance
   );
 
   for (let step = 1; step <= 6; step++) {
