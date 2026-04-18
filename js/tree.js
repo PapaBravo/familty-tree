@@ -117,7 +117,7 @@ function buildRenderGraph(data, rootId, depth, renderMode) {
   const descendantsLayout = buildDescendantsLayout(rootId, persons);
   if (!descendantsLayout) return { error: 'Root not found' };
 
-  const nodePositions = { ...descendantsLayout.nodePositions };
+  const nodePositions = descendantsLayout.nodePositions;
   const partnerNodes = buildPartnerOnlyNodes(
     persons,
     descendantsLayout.treeNodes,
