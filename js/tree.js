@@ -159,7 +159,7 @@ function renderTree() {
   } else {
     const linkGen = d3.linkVertical().x(d => d.x).y(d => d.y);
     g.selectAll('.link.parent-child')
-      .data(treeNodes.map(node => node.parent ? { source: node.parent, target: node } : null).filter(Boolean))
+      .data(getTreeParentChildLinks(treeNodes))
       .join('path')
       .attr('class', d => {
         const rel = getParentChildRelation(d.source.data, d.target.data);
@@ -396,8 +396,10 @@ function buildAncestorGraphLayout(rootId, persons, partnerships) {
     });
   }
 
+  const knownLevels = Object.values(levels);
+  const fallbackLevel = knownLevels.length > 0 ? (Math.max(...knownLevels) + 1) : 1;
   persons.forEach(p => {
-    if (levels[p.id] === undefined) levels[p.id] = 0;
+    if (levels[p.id] === undefined) levels[p.id] = fallbackLevel;
   });
 
   const levelValues = Array.from(new Set(Object.values(levels))).sort((a, b) => a - b);
@@ -434,7 +436,7 @@ function getAnchorX(personId, positionsById, parentsByChildId, partnerships) {
     if (parentPos) anchors.push(parentPos.x);
   });
   (partnerships || []).forEach(pp => {
-    const partnerId = pp.person1Id === personId ? pp.person2Id : (pp.person2Id === personId ? pp.person1Id : null);
+    const partnerId = getPartnerId(pp, personId);
     if (!partnerId) return;
     const partnerPos = positionsById[partnerId];
     if (partnerPos) anchors.push(partnerPos.x);
@@ -458,6 +460,19 @@ function getIncludedParentChildEdges(persons) {
     });
   });
   return edges;
+}
+
+function getTreeParentChildLinks(treeNodes) {
+  return treeNodes
+    .map(node => (node.parent ? { source: node.parent, target: node } : null))
+    .filter(Boolean);
+}
+
+function getPartnerId(partnership, personId) {
+  if (!partnership || !personId) return null;
+  if (partnership.person1Id === personId) return partnership.person2Id;
+  if (partnership.person2Id === personId) return partnership.person1Id;
+  return null;
 }
 
 function getParentChildRelation(personA, personB) {
