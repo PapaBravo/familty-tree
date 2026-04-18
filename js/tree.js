@@ -92,6 +92,7 @@ function renderTree() {
   let nodePositions = {};
   let parentChildEdges = [];
   let treeNodes = [];
+  let treeParentChildLinks = [];
 
   if (renderMode === 'ancestors') {
     const graphLayout = buildAncestorGraphLayout(rootId, persons, partnerships);
@@ -133,6 +134,7 @@ function renderTree() {
 
     treeLayout(root);
     treeNodes = root.descendants();
+    treeParentChildLinks = root.links();
     treeNodes.forEach(n => { nodePositions[n.data.id] = { x: n.x, y: n.y }; });
   }
 
@@ -159,7 +161,7 @@ function renderTree() {
   } else {
     const linkGen = d3.linkVertical().x(d => d.x).y(d => d.y);
     g.selectAll('.link.parent-child')
-      .data(extractParentChildLinksFromTree(treeNodes))
+      .data(treeParentChildLinks)
       .join('path')
       .attr('class', d => {
         const rel = getParentChildRelation(d.source.data, d.target.data);
@@ -364,7 +366,7 @@ function buildAncestorGraphLayout(rootId, persons, partnerships) {
 
     (parentsByChildId[currentId] || []).forEach(parentId => {
       const parentLevel = currentLevel - 1;
-      if (levels[parentId] === undefined || parentLevel < levels[parentId]) {
+      if (levels[parentId] === undefined) {
         levels[parentId] = parentLevel;
         queue.push(parentId);
       }
@@ -372,7 +374,7 @@ function buildAncestorGraphLayout(rootId, persons, partnerships) {
 
     (childrenByParentId[currentId] || []).forEach(childId => {
       const childLevel = currentLevel + 1;
-      if (levels[childId] === undefined || childLevel > levels[childId]) {
+      if (levels[childId] === undefined) {
         levels[childId] = childLevel;
         queue.push(childId);
       }
@@ -460,12 +462,6 @@ function getIncludedParentChildEdges(persons) {
     });
   });
   return edges;
-}
-
-function extractParentChildLinksFromTree(treeNodes) {
-  return treeNodes
-    .map(node => (node.parent ? { source: node.parent, target: node } : null))
-    .filter(Boolean);
 }
 
 function getPartnerId(partnership, personId) {
