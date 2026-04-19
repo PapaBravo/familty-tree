@@ -575,7 +575,7 @@ function buildFullFamilyLevels(rootId, persons, parentChildEdges) {
         }
         if (levels[next.id] !== expected) {
           // Keep strict parent→child (+1) generation direction stable by only moving along edge direction:
-          // parents can pull children downward (higher generation index), children can pull parents upward.
+          // parents can pull children downward on screen (higher generation index / larger y), children can pull parents upward.
           if (next.delta > 0 && levels[next.id] < expected) levels[next.id] = expected;
           if (next.delta < 0 && levels[next.id] > expected) levels[next.id] = expected;
         }
