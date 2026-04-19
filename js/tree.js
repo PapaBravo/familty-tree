@@ -395,6 +395,7 @@ function buildAncestorGraphLayout(rootId, persons, partnerships) {
   }
   const levelValues = Array.from(levelSet).sort((a, b) => a - b);
   const positionsById = {};
+  const levelPersonIds = {};
   levelValues.forEach(level => {
     const levelPersons = persons
       .filter(p => levels[p.id] === level)
@@ -405,11 +406,22 @@ function buildAncestorGraphLayout(rootId, persons, partnerships) {
         if (ax !== bx) return ax - bx;
         return (a.name || '').localeCompare(b.name || '');
       });
+
+    levelPersonIds[level] = levelPersons.map(p => p.id);
     const startX = -((levelPersons.length - 1) * H_SEP) / 2;
     levelPersons.forEach((person, idx) => {
       positionsById[person.id] = { x: startX + idx * H_SEP, y: level * V_SEP };
     });
   });
+
+  optimizeAncestorHorizontalPositions(
+    positionsById,
+    levelPersonIds,
+    parentsByChildId,
+    childrenByParentId,
+    partnerships,
+    levels
+  );
 
   const nodes = persons.map(person => ({
     person,
@@ -421,88 +433,54 @@ function buildAncestorGraphLayout(rootId, persons, partnerships) {
 }
 
 function buildAncestorLevels(rootId, persons, partnerships, parentChildEdges) {
-  const personIds = persons.map(p => p.id);
-  const dsu = createDisjointSet(personIds);
-  const personIdSet = new Set(personIds);
+  const personById = {};
+  persons.forEach(p => { personById[p.id] = p; });
+  const personIdSet = new Set(persons.map(p => p.id));
 
-  // Keep partners on the same generation level.
-  (partnerships || []).forEach(pp => {
-    if (!personIdSet.has(pp.person1Id) || !personIdSet.has(pp.person2Id)) return;
-    dsu.union(pp.person1Id, pp.person2Id);
-  });
-
-  // Keep siblings (children of the same parent) on the same generation level.
-  const childIdsByParentId = {};
+  const neighbors = {};
+  persons.forEach(p => { neighbors[p.id] = []; });
   parentChildEdges.forEach(edge => {
-    if (!childIdsByParentId[edge.parentId]) childIdsByParentId[edge.parentId] = [];
-    childIdsByParentId[edge.parentId].push(edge.childId);
+    if (!personIdSet.has(edge.parentId) || !personIdSet.has(edge.childId)) return;
+    neighbors[edge.parentId].push({ id: edge.childId, delta: 1 });
+    neighbors[edge.childId].push({ id: edge.parentId, delta: -1 });
   });
-  Object.values(childIdsByParentId).forEach(childIds => {
-    if (childIds.length < 2) return;
-    const firstChildId = childIds[0];
-    childIds.slice(1).forEach(childId => dsu.union(firstChildId, childId));
-  });
-
-  const componentByPersonId = {};
-  persons.forEach(p => { componentByPersonId[p.id] = dsu.find(p.id); });
-  const componentIds = Array.from(new Set(Object.values(componentByPersonId)));
-
-  const childComponentsByParentComponent = {};
-  const indegreeByComponent = {};
-  const levelByComponent = {};
-  componentIds.forEach(componentId => {
-    childComponentsByParentComponent[componentId] = new Set();
-    indegreeByComponent[componentId] = 0;
-    levelByComponent[componentId] = 0;
-  });
-
-  parentChildEdges.forEach(edge => {
-    const parentComponentId = componentByPersonId[edge.parentId];
-    const childComponentId = componentByPersonId[edge.childId];
-    if (!parentComponentId || !childComponentId || parentComponentId === childComponentId) return;
-    const children = childComponentsByParentComponent[parentComponentId];
-    if (children.has(childComponentId)) return;
-    children.add(childComponentId);
-    indegreeByComponent[childComponentId] += 1;
-  });
-
-  const queue = componentIds.filter(componentId => indegreeByComponent[componentId] === 0);
-  const topoOrder = [];
-  while (queue.length > 0) {
-    const componentId = queue.shift();
-    topoOrder.push(componentId);
-    childComponentsByParentComponent[componentId].forEach(childComponentId => {
-      indegreeByComponent[childComponentId] -= 1;
-      if (indegreeByComponent[childComponentId] === 0) queue.push(childComponentId);
-    });
-  }
-
-  if (topoOrder.length === componentIds.length) {
-    topoOrder.forEach(componentId => {
-      childComponentsByParentComponent[componentId].forEach(childComponentId => {
-        relaxChildComponentLevel(levelByComponent, componentId, childComponentId);
-      });
-    });
-  } else {
-    // Fallback for malformed cyclical data.
-    let changed = true;
-    let iteration = 0;
-    const maxIterations = componentIds.length || 1;
-    while (changed && iteration < maxIterations) {
-      changed = false;
-      iteration += 1;
-      componentIds.forEach(componentId => {
-        childComponentsByParentComponent[componentId].forEach(childComponentId => {
-          const didChange = relaxChildComponentLevel(levelByComponent, componentId, childComponentId);
-          if (didChange) changed = true;
-        });
-      });
-    }
-  }
 
   const levels = {};
+  if (personById[rootId]) levels[rootId] = 0;
+
+  const queue = personById[rootId] ? [rootId] : [];
+  while (queue.length > 0) {
+    const currentId = queue.shift();
+    const currentLevel = levels[currentId];
+    (neighbors[currentId] || []).forEach(edge => {
+      if (levels[edge.id] !== undefined) return;
+      levels[edge.id] = currentLevel + edge.delta;
+      queue.push(edge.id);
+    });
+  }
+
+  let changed = true;
+  let guard = 0;
+  const maxIterations = persons.length + 4;
+  while (changed && guard < maxIterations) {
+    changed = false;
+    guard += 1;
+    (partnerships || []).forEach(pp => {
+      if (!personIdSet.has(pp.person1Id) || !personIdSet.has(pp.person2Id)) return;
+      const l1 = levels[pp.person1Id];
+      const l2 = levels[pp.person2Id];
+      if (l1 !== undefined && l2 === undefined) {
+        levels[pp.person2Id] = l1;
+        changed = true;
+      } else if (l2 !== undefined && l1 === undefined) {
+        levels[pp.person1Id] = l2;
+        changed = true;
+      }
+    });
+  }
+
   persons.forEach(p => {
-    levels[p.id] = levelByComponent[componentByPersonId[p.id]];
+    if (levels[p.id] === undefined) levels[p.id] = 0;
   });
 
   const rootLevel = levels[rootId] !== undefined ? levels[rootId] : 0;
@@ -513,51 +491,101 @@ function buildAncestorLevels(rootId, persons, partnerships, parentChildEdges) {
   return levels;
 }
 
-function relaxChildComponentLevel(levelByComponent, parentComponentId, childComponentId) {
-  const expected = levelByComponent[parentComponentId] + 1;
-  if (levelByComponent[childComponentId] < expected) {
-    levelByComponent[childComponentId] = expected;
-    return true;
+function optimizeAncestorHorizontalPositions(
+  positionsById,
+  levelPersonIds,
+  parentsByChildId,
+  childrenByParentId,
+  partnerships,
+  levels
+) {
+  const personIds = Object.keys(positionsById);
+  const minGap = H_SEP * 0.95;
+  const sameLevelPartnerships = (partnerships || []).filter(pp =>
+    levels[pp.person1Id] !== undefined &&
+    levels[pp.person1Id] === levels[pp.person2Id]
+  );
+
+  for (let i = 0; i < 60; i++) {
+    const proposed = {};
+    personIds.forEach(id => { proposed[id] = positionsById[id].x; });
+
+    personIds.forEach(id => {
+      const current = proposed[id];
+      const parentIds = (parentsByChildId[id] || []).filter(parentId => proposed[parentId] !== undefined);
+      if (parentIds.length > 0) {
+        const parentMid = parentIds.reduce((sum, parentId) => sum + proposed[parentId], 0) / parentIds.length;
+        proposed[id] = current + (parentMid - current) * 0.55;
+      } else {
+        const childIds = (childrenByParentId[id] || []).filter(childId => proposed[childId] !== undefined);
+        if (childIds.length > 0) {
+          const childMid = childIds.reduce((sum, childId) => sum + proposed[childId], 0) / childIds.length;
+          proposed[id] = current + (childMid - current) * 0.2;
+        }
+      }
+    });
+
+    sameLevelPartnerships.forEach(pp => {
+      const id1 = pp.person1Id;
+      const id2 = pp.person2Id;
+      if (proposed[id1] === undefined || proposed[id2] === undefined) return;
+      let leftId = id1;
+      let rightId = id2;
+      if (proposed[id1] > proposed[id2]) {
+        leftId = id2;
+        rightId = id1;
+      }
+      const gap = proposed[rightId] - proposed[leftId];
+      const error = gap - H_SEP;
+      proposed[leftId] += error * 0.25;
+      proposed[rightId] -= error * 0.25;
+    });
+
+    Object.keys(levelPersonIds).forEach(level => {
+      resolveLevelOverlaps(levelPersonIds[level], proposed, positionsById, minGap);
+    });
   }
-  return false;
+
+  for (let pass = 0; pass < 3; pass++) {
+    personIds.forEach(id => {
+      const parentIds = (parentsByChildId[id] || []).filter(parentId => positionsById[parentId]);
+      if (parentIds.length === 0) return;
+      const midpoint = parentIds.reduce((sum, parentId) => sum + positionsById[parentId].x, 0) / parentIds.length;
+      positionsById[id].x = midpoint;
+    });
+    Object.keys(levelPersonIds).forEach(level => {
+      const proposed = {};
+      levelPersonIds[level].forEach(id => { proposed[id] = positionsById[id].x; });
+      resolveLevelOverlaps(levelPersonIds[level], proposed, positionsById, minGap);
+    });
+  }
 }
 
-function createDisjointSet(ids) {
-  const parent = {};
-  const rank = {};
+function resolveLevelOverlaps(levelIds, proposed, positionsById, minGap) {
+  const ordered = (levelIds || [])
+    .filter(id => proposed[id] !== undefined)
+    .slice()
+    .sort((a, b) => {
+      if (proposed[a] !== proposed[b]) return proposed[a] - proposed[b];
+      return a.localeCompare(b);
+    });
+  if (ordered.length === 0) return;
 
-  ids.forEach(id => {
-    parent[id] = id;
-    rank[id] = 0;
+  const adjusted = {};
+  adjusted[ordered[0]] = proposed[ordered[0]];
+  for (let i = 1; i < ordered.length; i++) {
+    const id = ordered[i];
+    const prevId = ordered[i - 1];
+    adjusted[id] = Math.max(proposed[id], adjusted[prevId] + minGap);
+  }
+
+  const meanAdjusted = ordered.reduce((sum, id) => sum + adjusted[id], 0) / ordered.length;
+  const meanProposed = ordered.reduce((sum, id) => sum + proposed[id], 0) / ordered.length;
+  const shift = meanProposed - meanAdjusted;
+
+  ordered.forEach(id => {
+    positionsById[id].x = adjusted[id] + shift;
   });
-
-  function find(id) {
-    let root = id;
-    while (parent[root] !== root) root = parent[root];
-    let current = id;
-    while (parent[current] !== current) {
-      const next = parent[current];
-      parent[current] = root;
-      current = next;
-    }
-    return root;
-  }
-
-  function union(a, b) {
-    const rootA = find(a);
-    const rootB = find(b);
-    if (rootA === rootB) return;
-    if (rank[rootA] < rank[rootB]) {
-      parent[rootA] = rootB;
-    } else if (rank[rootA] > rank[rootB]) {
-      parent[rootB] = rootA;
-    } else {
-      parent[rootB] = rootA;
-      rank[rootA] += 1;
-    }
-  }
-
-  return { find, union };
 }
 
 function getAnchorX(personId, positionsById, parentsByChildId, partnerships) {
