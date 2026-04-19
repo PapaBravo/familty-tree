@@ -14,12 +14,12 @@ const V_SEP  = 160;  // vertical separation
 const PARTNER_ROW_PROXIMITY = 12;
 const MIN_PARTNER_DISTANCE_FACTOR = 0.8;
 const MAX_PARTNER_PLACEMENT_STEPS = 6;
-const ANCESTOR_MIN_GAP_FACTOR = 0.95;
-const ANCESTOR_OPTIMIZATION_ITERATIONS = 60;
-const ANCESTOR_FINAL_ALIGNMENT_PASSES = 3;
-const PARENT_MIDPOINT_PULL = 0.55;
-const CHILD_MIDPOINT_PULL = 0.2;
-const PARTNER_GAP_CORRECTION = 0.25;
+const ANCESTOR_MIN_GAP_FACTOR = 0.95;            // Keep same-row nodes nearly one H_SEP apart while allowing subtle compression.
+const ANCESTOR_OPTIMIZATION_ITERATIONS = 60;     // Iteration budget for horizontal constraint settling.
+const ANCESTOR_FINAL_ALIGNMENT_PASSES = 3;       // Final midpoint alignment passes after iterative settling.
+const PARENT_MIDPOINT_PULL = 0.55;               // Strength for pulling children toward parent midpoint.
+const CHILD_MIDPOINT_PULL = 0.2;                 // Lighter reverse pull from parents toward children.
+const PARTNER_GAP_CORRECTION = 0.25;             // Strength for spouse-gap correction toward one H_SEP.
 
 let _treeZoom = null;
 let _svg = null;
@@ -465,11 +465,12 @@ function buildAncestorLevels(rootId, persons, partnerships, parentChildEdges) {
     });
   }
 
-  let changed = true;
+  let levelsUpdated = true;
   let iterationCount = 0;
+  // +4 gives a small safety buffer beyond person count for partnership propagation chains.
   const maxIterations = persons.length + 4;
-  while (changed && iterationCount < maxIterations) {
-    changed = false;
+  while (levelsUpdated && iterationCount < maxIterations) {
+    levelsUpdated = false;
     iterationCount += 1;
     (partnerships || []).forEach(pp => {
       if (!personIdSet.has(pp.person1Id) || !personIdSet.has(pp.person2Id)) return;
@@ -477,10 +478,10 @@ function buildAncestorLevels(rootId, persons, partnerships, parentChildEdges) {
       const l2 = levels[pp.person2Id];
       if (l1 !== undefined && l2 === undefined) {
         levels[pp.person2Id] = l1;
-        changed = true;
+        levelsUpdated = true;
       } else if (l2 !== undefined && l1 === undefined) {
         levels[pp.person1Id] = l2;
-        changed = true;
+        levelsUpdated = true;
       }
     });
   }
@@ -512,7 +513,7 @@ function optimizeAncestorHorizontalPositions(
     levels[pp.person1Id] === levels[pp.person2Id]
   );
 
-  for (let i = 0; i < ANCESTOR_OPTIMIZATION_ITERATIONS; i++) {
+  for (let iteration = 0; iteration < ANCESTOR_OPTIMIZATION_ITERATIONS; iteration++) {
     const proposed = {};
     personIds.forEach(id => { proposed[id] = positionsById[id].x; });
 
@@ -552,7 +553,7 @@ function optimizeAncestorHorizontalPositions(
     });
   }
 
-  for (let pass = 0; pass < ANCESTOR_FINAL_ALIGNMENT_PASSES; pass++) {
+  for (let alignmentPass = 0; alignmentPass < ANCESTOR_FINAL_ALIGNMENT_PASSES; alignmentPass++) {
     personIds.forEach(id => {
       const parentIds = (parentsByChildId[id] || []).filter(parentId => positionsById[parentId]);
       if (parentIds.length === 0) return;
