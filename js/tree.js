@@ -20,12 +20,14 @@ const ANCESTOR_FINAL_ALIGNMENT_PASSES = 3;       // Final midpoint alignment pas
 const PARENT_MIDPOINT_PULL = 0.55;               // Strength for pulling children toward parent midpoint.
 const CHILD_MIDPOINT_PULL = 0.2;                 // Lighter reverse pull from parents toward children.
 const PARTNER_GAP_CORRECTION = 0.25;             // Strength for spouse-gap correction toward one H_SEP.
+// Full-family constants are empirically tuned for readable spacing on mixed-size family datasets.
 const FULL_FAMILY_MIN_GAP_FACTOR = 0.78;          // Minimum same-row spacing as a fraction of H_SEP.
 const FULL_FAMILY_OPTIMIZATION_ITERATIONS = 90;   // Iterative gravity-settling budget.
 const FULL_FAMILY_PARTNER_PULL = 0.52;            // Primary pull: keeps spouses near each other.
 const FULL_FAMILY_PARENT_PULL = 0.38;             // Secondary pull: keep children under parent midpoint.
 const FULL_FAMILY_CHILD_PULL = 0.12;              // Light reverse pull for parent balancing.
 const FULL_FAMILY_TARGET_PARTNER_GAP_FACTOR = 0.72; // Preferred spouse gap relative to H_SEP.
+const FULL_FAMILY_RELAXATION_ITERATION_MULTIPLIER = 2; // Empirically sufficient for practical family DAGs.
 
 let _treeZoom = null;
 let _svg = null;
@@ -572,8 +574,8 @@ function buildFullFamilyLevels(rootId, persons, parentChildEdges) {
           return;
         }
         if (levels[next.id] !== expected) {
-          // Keep the strict parent→child (+1) direction stable by only moving in the edge direction:
-          // parents can pull children rightward (higher level), children can pull parents leftward (lower level).
+          // Keep strict parent→child (+1) generation direction stable by only moving along edge direction:
+          // parents can pull children downward (higher generation index), children can pull parents upward.
           if (next.delta > 0 && levels[next.id] < expected) levels[next.id] = expected;
           if (next.delta < 0 && levels[next.id] > expected) levels[next.id] = expected;
         }
@@ -589,8 +591,8 @@ function buildFullFamilyLevels(rootId, persons, parentChildEdges) {
 
   persons.forEach(p => seedLevel(p.id, 0));
 
-  // Bounded relaxation pass: 2*N is sufficient for convergence in practical family DAGs while preventing runaway loops.
-  for (let i = 0; i < persons.length * 2; i++) {
+  // Bounded relaxation pass: empirically converges on realistic family data while preventing runaway loops.
+  for (let i = 0; i < persons.length * FULL_FAMILY_RELAXATION_ITERATION_MULTIPLIER; i++) {
     let changed = false;
     parentChildEdges.forEach(edge => {
       const expectedChildLevel = levels[edge.parentId] + 1;
