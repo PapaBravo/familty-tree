@@ -14,6 +14,12 @@ const V_SEP  = 160;  // vertical separation
 const PARTNER_ROW_PROXIMITY = 12;
 const MIN_PARTNER_DISTANCE_FACTOR = 0.8;
 const MAX_PARTNER_PLACEMENT_STEPS = 6;
+const ANCESTOR_MIN_GAP_FACTOR = 0.95;
+const ANCESTOR_OPTIMIZATION_ITERATIONS = 60;
+const ANCESTOR_FINAL_ALIGNMENT_PASSES = 3;
+const PARENT_MIDPOINT_PULL = 0.55;
+const CHILD_MIDPOINT_PULL = 0.2;
+const PARTNER_GAP_CORRECTION = 0.25;
 
 let _treeZoom = null;
 let _svg = null;
@@ -460,11 +466,11 @@ function buildAncestorLevels(rootId, persons, partnerships, parentChildEdges) {
   }
 
   let changed = true;
-  let guard = 0;
+  let iterationCount = 0;
   const maxIterations = persons.length + 4;
-  while (changed && guard < maxIterations) {
+  while (changed && iterationCount < maxIterations) {
     changed = false;
-    guard += 1;
+    iterationCount += 1;
     (partnerships || []).forEach(pp => {
       if (!personIdSet.has(pp.person1Id) || !personIdSet.has(pp.person2Id)) return;
       const l1 = levels[pp.person1Id];
@@ -500,13 +506,13 @@ function optimizeAncestorHorizontalPositions(
   levels
 ) {
   const personIds = Object.keys(positionsById);
-  const minGap = H_SEP * 0.95;
+  const minGap = H_SEP * ANCESTOR_MIN_GAP_FACTOR;
   const sameLevelPartnerships = (partnerships || []).filter(pp =>
     levels[pp.person1Id] !== undefined &&
     levels[pp.person1Id] === levels[pp.person2Id]
   );
 
-  for (let i = 0; i < 60; i++) {
+  for (let i = 0; i < ANCESTOR_OPTIMIZATION_ITERATIONS; i++) {
     const proposed = {};
     personIds.forEach(id => { proposed[id] = positionsById[id].x; });
 
@@ -515,12 +521,12 @@ function optimizeAncestorHorizontalPositions(
       const parentIds = (parentsByChildId[id] || []).filter(parentId => proposed[parentId] !== undefined);
       if (parentIds.length > 0) {
         const parentMid = parentIds.reduce((sum, parentId) => sum + proposed[parentId], 0) / parentIds.length;
-        proposed[id] = current + (parentMid - current) * 0.55;
+        proposed[id] = current + (parentMid - current) * PARENT_MIDPOINT_PULL;
       } else {
         const childIds = (childrenByParentId[id] || []).filter(childId => proposed[childId] !== undefined);
         if (childIds.length > 0) {
           const childMid = childIds.reduce((sum, childId) => sum + proposed[childId], 0) / childIds.length;
-          proposed[id] = current + (childMid - current) * 0.2;
+          proposed[id] = current + (childMid - current) * CHILD_MIDPOINT_PULL;
         }
       }
     });
@@ -537,8 +543,8 @@ function optimizeAncestorHorizontalPositions(
       }
       const gap = proposed[rightId] - proposed[leftId];
       const error = gap - H_SEP;
-      proposed[leftId] += error * 0.25;
-      proposed[rightId] -= error * 0.25;
+      proposed[leftId] += error * PARTNER_GAP_CORRECTION;
+      proposed[rightId] -= error * PARTNER_GAP_CORRECTION;
     });
 
     Object.keys(levelPersonIds).forEach(level => {
@@ -546,7 +552,7 @@ function optimizeAncestorHorizontalPositions(
     });
   }
 
-  for (let pass = 0; pass < 3; pass++) {
+  for (let pass = 0; pass < ANCESTOR_FINAL_ALIGNMENT_PASSES; pass++) {
     personIds.forEach(id => {
       const parentIds = (parentsByChildId[id] || []).filter(parentId => positionsById[parentId]);
       if (parentIds.length === 0) return;
