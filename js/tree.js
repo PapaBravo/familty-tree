@@ -73,6 +73,7 @@ function renderTree() {
     return;
   }
 
+  console.log('Final graph data structure:', graph);
   drawRenderGraph(graph);
 }
 
