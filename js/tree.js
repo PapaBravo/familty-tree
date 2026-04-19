@@ -455,8 +455,9 @@ function buildAncestorLevels(rootId, persons, partnerships, parentChildEdges) {
   if (personById[rootId]) levels[rootId] = 0;
 
   const queue = personById[rootId] ? [rootId] : [];
-  while (queue.length > 0) {
-    const currentId = queue.shift();
+  let queueIndex = 0;
+  while (queueIndex < queue.length) {
+    const currentId = queue[queueIndex++];
     const currentLevel = levels[currentId];
     (neighbors[currentId] || []).forEach(edge => {
       if (levels[edge.id] !== undefined) return;
@@ -465,24 +466,23 @@ function buildAncestorLevels(rootId, persons, partnerships, parentChildEdges) {
     });
   }
 
-  let levelsUpdated = true;
-  let iterationCount = 0;
-  // +4 gives a small safety buffer beyond person count for partnership propagation chains.
-  const maxIterations = persons.length + 4;
-  while (levelsUpdated && iterationCount < maxIterations) {
-    levelsUpdated = false;
-    iterationCount += 1;
-    (partnerships || []).forEach(pp => {
-      if (!personIdSet.has(pp.person1Id) || !personIdSet.has(pp.person2Id)) return;
-      const l1 = levels[pp.person1Id];
-      const l2 = levels[pp.person2Id];
-      if (l1 !== undefined && l2 === undefined) {
-        levels[pp.person2Id] = l1;
-        levelsUpdated = true;
-      } else if (l2 !== undefined && l1 === undefined) {
-        levels[pp.person1Id] = l2;
-        levelsUpdated = true;
-      }
+  const partnerIdsByPerson = {};
+  persons.forEach(p => { partnerIdsByPerson[p.id] = []; });
+  (partnerships || []).forEach(pp => {
+    if (!personIdSet.has(pp.person1Id) || !personIdSet.has(pp.person2Id)) return;
+    partnerIdsByPerson[pp.person1Id].push(pp.person2Id);
+    partnerIdsByPerson[pp.person2Id].push(pp.person1Id);
+  });
+
+  const partnerQueue = Object.keys(levels);
+  let partnerQueueIndex = 0;
+  while (partnerQueueIndex < partnerQueue.length) {
+    const id = partnerQueue[partnerQueueIndex++];
+    const level = levels[id];
+    (partnerIdsByPerson[id] || []).forEach(partnerId => {
+      if (levels[partnerId] !== undefined) return;
+      levels[partnerId] = level;
+      partnerQueue.push(partnerId);
     });
   }
 
