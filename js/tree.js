@@ -20,6 +20,12 @@ const ANCESTOR_FINAL_ALIGNMENT_PASSES = 3;       // Final midpoint alignment pas
 const PARENT_MIDPOINT_PULL = 0.55;               // Strength for pulling children toward parent midpoint.
 const CHILD_MIDPOINT_PULL = 0.2;                 // Lighter reverse pull from parents toward children.
 const PARTNER_GAP_CORRECTION = 0.25;             // Strength for spouse-gap correction toward one H_SEP.
+const FULL_FAMILY_MIN_GAP_FACTOR = 0.78;
+const FULL_FAMILY_OPTIMIZATION_ITERATIONS = 90;
+const FULL_FAMILY_PARTNER_PULL = 0.52;
+const FULL_FAMILY_PARENT_PULL = 0.38;
+const FULL_FAMILY_CHILD_PULL = 0.12;
+const FULL_FAMILY_TARGET_PARTNER_GAP_FACTOR = 0.72;
 
 let _treeZoom = null;
 let _svg = null;
@@ -84,17 +90,19 @@ function renderTree() {
 }
 
 function buildRenderGraph(data, rootId, depth, renderMode) {
-  const included = new Set();
-  let ancestorIds = [];
   if (renderMode === 'ancestors') {
-    collectAncestors(rootId, data, depth, 0, included);
-    ancestorIds = Array.from(included);
-    collectChildrenOfAncestors(data, ancestorIds, included, 2);
-    includePartnersOfPersons(data, new Set(ancestorIds), included, false);
-  } else {
-    collectDescendants(rootId, data, depth, 0, included);
-    includeCurrentPartners(data, included);
+    return buildAncestorsRenderGraph(data, rootId, depth);
   }
+  if (renderMode === 'full-family') {
+    return buildFullFamilyRenderGraph(data, rootId);
+  }
+  return buildDescendantsRenderGraph(data, rootId, depth);
+}
+
+function buildDescendantsRenderGraph(data, rootId, depth) {
+  const included = new Set();
+  collectDescendants(rootId, data, depth, 0, included);
+  includeCurrentPartners(data, included);
 
   const persons = data.persons.filter(p => included.has(p.id));
   const personById = {};
@@ -103,23 +111,6 @@ function buildRenderGraph(data, rootId, depth, renderMode) {
     pp => included.has(pp.person1Id) && included.has(pp.person2Id)
   );
   const currentPartnerships = partnerships.filter(pp => isCurrentPartnership(pp, personById));
-
-  if (renderMode === 'ancestors') {
-    const graphLayout = buildAncestorGraphLayout(rootId, persons, partnerships);
-    if (!graphLayout) return { error: 'Root not found' };
-
-    const nodePositions = {};
-    const allNodes = graphLayout.nodes.map(n => ({ data: n.person, x: n.x, y: n.y }));
-    allNodes.forEach(n => { nodePositions[n.data.id] = { x: n.x, y: n.y }; });
-    return {
-      renderMode,
-      allNodes,
-      nodePositions,
-      parentChildEdges: graphLayout.parentChildEdges,
-      treeParentChildLinks: [],
-      partnerships
-    };
-  }
 
   const descendantsLayout = buildDescendantsLayout(rootId, persons);
   if (!descendantsLayout) return { error: 'Root not found' };
@@ -133,11 +124,63 @@ function buildRenderGraph(data, rootId, depth, renderMode) {
   );
 
   return {
-    renderMode,
+    renderMode: 'descendants',
     allNodes: descendantsLayout.treeNodes.concat(partnerNodes.map(p => ({ data: p.person, x: p.x, y: p.y }))),
     nodePositions,
     parentChildEdges: [],
     treeParentChildLinks: descendantsLayout.treeParentChildLinks,
+    partnerships
+  };
+}
+
+function buildAncestorsRenderGraph(data, rootId, depth) {
+  const included = new Set();
+  collectAncestors(rootId, data, depth, 0, included);
+  const ancestorIds = Array.from(included);
+  collectChildrenOfAncestors(data, ancestorIds, included, 2);
+  includePartnersOfPersons(data, new Set(ancestorIds), included, false);
+
+  const persons = data.persons.filter(p => included.has(p.id));
+  const partnerships = (data.partnerships || []).filter(
+    pp => included.has(pp.person1Id) && included.has(pp.person2Id)
+  );
+
+  const graphLayout = buildAncestorGraphLayout(rootId, persons, partnerships);
+  if (!graphLayout) return { error: 'Root not found' };
+
+  const nodePositions = {};
+  const allNodes = graphLayout.nodes.map(n => ({ data: n.person, x: n.x, y: n.y }));
+  allNodes.forEach(n => { nodePositions[n.data.id] = { x: n.x, y: n.y }; });
+  return {
+    renderMode: 'ancestors',
+    allNodes,
+    nodePositions,
+    parentChildEdges: graphLayout.parentChildEdges,
+    treeParentChildLinks: [],
+    partnerships
+  };
+}
+
+function buildFullFamilyRenderGraph(data, rootId) {
+  const persons = (data.persons || []).slice();
+  if (!persons.find(p => p.id === rootId)) return { error: 'Root not found' };
+  const partnerships = (data.partnerships || []).filter(pp =>
+    persons.some(p => p.id === pp.person1Id) && persons.some(p => p.id === pp.person2Id)
+  );
+
+  const graphLayout = buildFullFamilyGraphLayout(rootId, persons, partnerships);
+  if (!graphLayout) return { error: 'Unable to build Full Family layout' };
+
+  const nodePositions = {};
+  const allNodes = graphLayout.nodes.map(n => ({ data: n.person, x: n.x, y: n.y }));
+  allNodes.forEach(n => { nodePositions[n.data.id] = { x: n.x, y: n.y }; });
+
+  return {
+    renderMode: 'full-family',
+    allNodes,
+    nodePositions,
+    parentChildEdges: graphLayout.parentChildEdges,
+    treeParentChildLinks: [],
     partnerships
   };
 }
@@ -436,6 +479,182 @@ function buildAncestorGraphLayout(rootId, persons, partnerships) {
   }));
 
   return { nodes, parentChildEdges };
+}
+
+function buildFullFamilyGraphLayout(rootId, persons, partnerships) {
+  const personById = {};
+  persons.forEach(p => { personById[p.id] = p; });
+  if (!personById[rootId]) return null;
+
+  const parentChildEdges = getIncludedParentChildEdges(persons);
+  const levels = buildFullFamilyLevels(rootId, persons, parentChildEdges);
+
+  const parentsByChildId = {};
+  const childrenByParentId = {};
+  persons.forEach(p => {
+    parentsByChildId[p.id] = [];
+    childrenByParentId[p.id] = [];
+  });
+  parentChildEdges.forEach(edge => {
+    parentsByChildId[edge.childId].push(edge.parentId);
+    childrenByParentId[edge.parentId].push(edge.childId);
+  });
+
+  const levelSet = new Set();
+  Object.keys(levels).forEach(id => levelSet.add(levels[id]));
+  const levelValues = Array.from(levelSet).sort((a, b) => a - b);
+
+  const positionsById = {};
+  const levelPersonIds = {};
+  levelValues.forEach(level => {
+    const levelIds = persons
+      .filter(p => levels[p.id] === level)
+      .slice()
+      .sort((a, b) => {
+        const ax = getAnchorX(a.id, positionsById, parentsByChildId, partnerships);
+        const bx = getAnchorX(b.id, positionsById, parentsByChildId, partnerships);
+        if (ax !== bx) return ax - bx;
+        return (a.name || '').localeCompare(b.name || '');
+      })
+      .map(p => p.id);
+    levelPersonIds[level] = levelIds;
+    const startX = -((levelIds.length - 1) * H_SEP) / 2;
+    levelIds.forEach((personId, idx) => {
+      positionsById[personId] = { x: startX + idx * H_SEP, y: levels[personId] * V_SEP };
+    });
+  });
+
+  optimizeFullFamilyHorizontalPositions(
+    positionsById,
+    levelPersonIds,
+    parentsByChildId,
+    childrenByParentId,
+    partnerships,
+    levels
+  );
+
+  const nodes = persons.map(person => ({
+    person,
+    x: positionsById[person.id].x,
+    y: positionsById[person.id].y
+  }));
+  return { nodes, parentChildEdges };
+}
+
+function buildFullFamilyLevels(rootId, persons, parentChildEdges) {
+  const personById = {};
+  persons.forEach(p => { personById[p.id] = p; });
+  const adjacency = {};
+  persons.forEach(p => { adjacency[p.id] = []; });
+  parentChildEdges.forEach(edge => {
+    adjacency[edge.parentId].push({ id: edge.childId, delta: 1 });
+    adjacency[edge.childId].push({ id: edge.parentId, delta: -1 });
+  });
+
+  const levels = {};
+  const queue = [];
+  const visited = new Set();
+
+  function seedLevel(personId, level) {
+    if (!personById[personId] || visited.has(personId)) return;
+    visited.add(personId);
+    levels[personId] = level;
+    queue.push(personId);
+    while (queue.length > 0) {
+      const currentId = queue.shift();
+      const currentLevel = levels[currentId];
+      (adjacency[currentId] || []).forEach(next => {
+        const expected = currentLevel + next.delta;
+        if (levels[next.id] === undefined) {
+          levels[next.id] = expected;
+          queue.push(next.id);
+          visited.add(next.id);
+          return;
+        }
+        if (levels[next.id] !== expected) {
+          if (next.delta > 0 && levels[next.id] < expected) levels[next.id] = expected;
+          if (next.delta < 0 && levels[next.id] > expected) levels[next.id] = expected;
+        }
+      });
+    }
+  }
+
+  seedLevel(rootId, 0);
+
+  persons
+    .filter(p => (p.parents || []).filter(pr => personById[pr.personId]).length === 0)
+    .forEach(p => seedLevel(p.id, 0));
+
+  persons.forEach(p => seedLevel(p.id, 0));
+
+  for (let i = 0; i < persons.length * 2; i++) {
+    let changed = false;
+    parentChildEdges.forEach(edge => {
+      const expectedChildLevel = levels[edge.parentId] + 1;
+      if (levels[edge.childId] !== expectedChildLevel) {
+        levels[edge.childId] = expectedChildLevel;
+        changed = true;
+      }
+    });
+    if (!changed) break;
+  }
+
+  const minLevel = Math.min(...Object.values(levels));
+  Object.keys(levels).forEach(id => {
+    levels[id] -= minLevel;
+  });
+  return levels;
+}
+
+function optimizeFullFamilyHorizontalPositions(
+  positionsById,
+  levelPersonIds,
+  parentsByChildId,
+  childrenByParentId,
+  partnerships,
+  levels
+) {
+  const personIds = Object.keys(positionsById);
+  const minGap = H_SEP * FULL_FAMILY_MIN_GAP_FACTOR;
+  const sameLevelPartnerships = (partnerships || []).filter(pp =>
+    levels[pp.person1Id] !== undefined && levels[pp.person1Id] === levels[pp.person2Id]
+  );
+  const targetPartnerGap = H_SEP * FULL_FAMILY_TARGET_PARTNER_GAP_FACTOR;
+
+  for (let iteration = 0; iteration < FULL_FAMILY_OPTIMIZATION_ITERATIONS; iteration++) {
+    const proposed = {};
+    personIds.forEach(id => { proposed[id] = positionsById[id].x; });
+
+    sameLevelPartnerships.forEach(pp => {
+      const x1 = proposed[pp.person1Id];
+      const x2 = proposed[pp.person2Id];
+      if (x1 === undefined || x2 === undefined) return;
+      const midpoint = (x1 + x2) / 2;
+      const leftId = x1 <= x2 ? pp.person1Id : pp.person2Id;
+      const rightId = leftId === pp.person1Id ? pp.person2Id : pp.person1Id;
+      proposed[leftId] = x1 + (midpoint - targetPartnerGap / 2 - x1) * FULL_FAMILY_PARTNER_PULL;
+      proposed[rightId] = x2 + (midpoint + targetPartnerGap / 2 - x2) * FULL_FAMILY_PARTNER_PULL;
+    });
+
+    personIds.forEach(id => {
+      const current = proposed[id];
+      const parentIds = (parentsByChildId[id] || []).filter(parentId => proposed[parentId] !== undefined);
+      if (parentIds.length > 0) {
+        const parentMidpoint = parentIds.reduce((sum, parentId) => sum + proposed[parentId], 0) / parentIds.length;
+        proposed[id] = current + (parentMidpoint - current) * FULL_FAMILY_PARENT_PULL;
+      } else {
+        const childIds = (childrenByParentId[id] || []).filter(childId => proposed[childId] !== undefined);
+        if (childIds.length > 0) {
+          const childMidpoint = childIds.reduce((sum, childId) => sum + proposed[childId], 0) / childIds.length;
+          proposed[id] = current + (childMidpoint - current) * FULL_FAMILY_CHILD_PULL;
+        }
+      }
+    });
+
+    Object.keys(levelPersonIds).forEach(level => {
+      resolveLevelOverlaps(levelPersonIds[level], proposed, positionsById, minGap);
+    });
+  }
 }
 
 function buildAncestorLevels(rootId, persons, partnerships, parentChildEdges) {
