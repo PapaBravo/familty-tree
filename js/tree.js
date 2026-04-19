@@ -20,12 +20,12 @@ const ANCESTOR_FINAL_ALIGNMENT_PASSES = 3;       // Final midpoint alignment pas
 const PARENT_MIDPOINT_PULL = 0.55;               // Strength for pulling children toward parent midpoint.
 const CHILD_MIDPOINT_PULL = 0.2;                 // Lighter reverse pull from parents toward children.
 const PARTNER_GAP_CORRECTION = 0.25;             // Strength for spouse-gap correction toward one H_SEP.
-const FULL_FAMILY_MIN_GAP_FACTOR = 0.78;
-const FULL_FAMILY_OPTIMIZATION_ITERATIONS = 90;
-const FULL_FAMILY_PARTNER_PULL = 0.52;
-const FULL_FAMILY_PARENT_PULL = 0.38;
-const FULL_FAMILY_CHILD_PULL = 0.12;
-const FULL_FAMILY_TARGET_PARTNER_GAP_FACTOR = 0.72;
+const FULL_FAMILY_MIN_GAP_FACTOR = 0.78;          // Minimum same-row spacing as a fraction of H_SEP.
+const FULL_FAMILY_OPTIMIZATION_ITERATIONS = 90;   // Iterative gravity-settling budget.
+const FULL_FAMILY_PARTNER_PULL = 0.52;            // Primary pull: keeps spouses near each other.
+const FULL_FAMILY_PARENT_PULL = 0.38;             // Secondary pull: keep children under parent midpoint.
+const FULL_FAMILY_CHILD_PULL = 0.12;              // Light reverse pull for parent balancing.
+const FULL_FAMILY_TARGET_PARTNER_GAP_FACTOR = 0.72; // Preferred spouse gap relative to H_SEP.
 
 let _treeZoom = null;
 let _svg = null;
@@ -572,6 +572,8 @@ function buildFullFamilyLevels(rootId, persons, parentChildEdges) {
           return;
         }
         if (levels[next.id] !== expected) {
+          // Keep the strict parent→child (+1) direction stable by only moving in the edge direction:
+          // parents can pull children rightward (higher level), children can pull parents leftward (lower level).
           if (next.delta > 0 && levels[next.id] < expected) levels[next.id] = expected;
           if (next.delta < 0 && levels[next.id] > expected) levels[next.id] = expected;
         }
@@ -587,6 +589,7 @@ function buildFullFamilyLevels(rootId, persons, parentChildEdges) {
 
   persons.forEach(p => seedLevel(p.id, 0));
 
+  // Bounded relaxation pass: 2*N is sufficient for convergence in practical family DAGs while preventing runaway loops.
   for (let i = 0; i < persons.length * 2; i++) {
     let changed = false;
     parentChildEdges.forEach(edge => {
