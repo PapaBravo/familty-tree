@@ -241,7 +241,7 @@ function drawRenderGraph(graph) {
   const W = svgEl.clientWidth || 800;
   const H = svgEl.clientHeight || 600;
 
-  if (renderMode === 'ancestors') {
+  if (renderMode === 'ancestors' || renderMode === 'full-family') {
     g.selectAll('.link.parent-child')
       .data(parentChildEdges)
       .join('path')
@@ -489,7 +489,7 @@ function buildFullFamilyGraphLayout(rootId, persons, partnerships) {
   if (!personById[rootId]) return null;
 
   const parentChildEdges = getIncludedParentChildEdges(persons);
-  const levels = buildFullFamilyLevels(rootId, persons, parentChildEdges);
+  const levels = buildFullFamilyLevels(rootId, persons, parentChildEdges, partnerships);
 
   const parentsByChildId = {};
   const childrenByParentId = {};
@@ -543,7 +543,7 @@ function buildFullFamilyGraphLayout(rootId, persons, partnerships) {
   return { nodes, parentChildEdges };
 }
 
-function buildFullFamilyLevels(rootId, persons, parentChildEdges) {
+function buildFullFamilyLevels(rootId, persons, parentChildEdges, partnerships) {
   const personById = {};
   persons.forEach(p => { personById[p.id] = p; });
   const adjacency = {};
@@ -551,6 +551,12 @@ function buildFullFamilyLevels(rootId, persons, parentChildEdges) {
   parentChildEdges.forEach(edge => {
     adjacency[edge.parentId].push({ id: edge.childId, delta: 1 });
     adjacency[edge.childId].push({ id: edge.parentId, delta: -1 });
+  });
+  (partnerships || []).forEach(pp => {
+    if (!personById[pp.person1Id] || !personById[pp.person2Id]) return;
+    if (pp.person1Id === pp.person2Id) return;
+    adjacency[pp.person1Id].push({ id: pp.person2Id, delta: 0 });
+    adjacency[pp.person2Id].push({ id: pp.person1Id, delta: 0 });
   });
 
   const levels = {};
@@ -576,6 +582,7 @@ function buildFullFamilyLevels(rootId, persons, parentChildEdges) {
         if (levels[next.id] !== expected) {
           // Keep strict parent→child (+1) generation direction stable by only moving along edge direction:
           // parents can pull children downward on screen (higher generation index, i.e. larger y = level * V_SEP), children can pull parents upward.
+          if (next.delta === 0) levels[next.id] = expected;
           if (next.delta > 0 && levels[next.id] < expected) levels[next.id] = expected;
           if (next.delta < 0 && levels[next.id] > expected) levels[next.id] = expected;
         }
@@ -598,6 +605,18 @@ function buildFullFamilyLevels(rootId, persons, parentChildEdges) {
       const expectedChildLevel = levels[edge.parentId] + 1;
       if (levels[edge.childId] !== expectedChildLevel) {
         levels[edge.childId] = expectedChildLevel;
+        changed = true;
+      }
+    });
+    (partnerships || []).forEach(pp => {
+      if (levels[pp.person1Id] === undefined || levels[pp.person2Id] === undefined) return;
+      const targetLevel = Math.round((levels[pp.person1Id] + levels[pp.person2Id]) / 2);
+      if (levels[pp.person1Id] !== targetLevel) {
+        levels[pp.person1Id] = targetLevel;
+        changed = true;
+      }
+      if (levels[pp.person2Id] !== targetLevel) {
+        levels[pp.person2Id] = targetLevel;
         changed = true;
       }
     });
