@@ -1058,19 +1058,21 @@ function drawForceGraph(graph) {
 
   nodeGroups.append('circle').attr('r', NODE_R);
 
-  // Clip paths for photos
-  const defs = _svg.append('defs');
-  simNodes.forEach((n, i) => {
+  // Clip paths for photos – reuse a single <defs> on the SVG, removing any
+  // stale force clip-paths from a previous render to avoid accumulation.
+  let defs = _svg.select('defs');
+  if (defs.empty()) defs = _svg.append('defs');
+  defs.selectAll('clipPath[id^="force-clip-"]').remove();
+
+  nodeGroups.each(function(d, i) {
     defs.append('clipPath')
       .attr('id', `force-clip-${i}`)
       .append('circle')
       .attr('r', NODE_R);
-  });
 
-  simNodes.forEach((n, i) => {
-    const safeUrl = sanitizeImageUrl(n.data.image);
+    const safeUrl = sanitizeImageUrl(d.data.image);
     if (safeUrl) {
-      nodeGroups.filter((d, j) => j === i)
+      d3.select(this)
         .append('image')
         .attr('href', safeUrl)
         .attr('x', -NODE_R).attr('y', -NODE_R)
