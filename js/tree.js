@@ -31,6 +31,7 @@ const FULL_FAMILY_RELAXATION_ITERATION_MULTIPLIER = 2; // Empirically sufficient
 
 let _treeZoom = null;
 let _svg = null;
+let _forceSimulation = null;
 
 function initTree() {
   _svg = d3.select('#tree-svg');
@@ -76,7 +77,7 @@ function renderTree() {
   const modeSelect = document.getElementById('tree-mode-select');
   const renderMode = modeSelect ? modeSelect.value : 'descendants';
 
-  if (!rootId) {
+  if (!rootId && renderMode !== 'force') {
     clearTree('Select a root person');
     return;
   }
@@ -97,6 +98,9 @@ function buildRenderGraph(data, rootId, depth, renderMode) {
   }
   if (renderMode === 'full-family') {
     return buildFullFamilyRenderGraph(data, rootId);
+  }
+  if (renderMode === 'force') {
+    return buildForceRenderGraph(data);
   }
   return buildDescendantsRenderGraph(data, rootId, depth);
 }
@@ -225,6 +229,17 @@ function buildDescendantsLayout(rootId, persons) {
 }
 
 function drawRenderGraph(graph) {
+  // Stop any running force simulation before clearing the canvas
+  if (_forceSimulation) {
+    _forceSimulation.stop();
+    _forceSimulation = null;
+  }
+
+  if (graph.renderMode === 'force') {
+    drawForceGraph(graph);
+    return;
+  }
+
   const {
     renderMode,
     allNodes,
@@ -950,6 +965,155 @@ function findPartnerNodePosition(anchorPos, preferredDir, occupied) {
   }
 
   return { x: anchorPos.x + (preferredDir ?? 1) * H_SEP, y: anchorPos.y };
+}
+
+function buildForceRenderGraph(data) {
+  const persons = (data.persons || []).slice();
+  const partnerships = (data.partnerships || []).filter(pp =>
+    persons.some(p => p.id === pp.person1Id) && persons.some(p => p.id === pp.person2Id)
+  );
+
+  // Build nodes
+  const nodes = persons.map(p => ({ id: p.id, data: p }));
+
+  // Partnership links get high strength
+  const partnershipLinks = partnerships.map(pp => ({
+    source: pp.person1Id,
+    target: pp.person2Id,
+    linkClass: pp.type,
+    strength: 0.9
+  }));
+
+  // Parent-child links get lower strength
+  const parentChildLinks = [];
+  persons.forEach(child => {
+    (child.parents || []).forEach(parentRef => {
+      if (persons.some(p => p.id === parentRef.personId) && parentRef.personId !== child.id) {
+        parentChildLinks.push({
+          source: parentRef.personId,
+          target: child.id,
+          linkClass: parentRef.type === 'adopted' ? 'adopted' : 'parent-child',
+          strength: 0.3
+        });
+      }
+    });
+  });
+
+  return {
+    renderMode: 'force',
+    nodes,
+    links: partnershipLinks.concat(parentChildLinks)
+  };
+}
+
+function drawForceGraph(graph) {
+  const { nodes, links } = graph;
+
+  const g = _svg.select('#tree-g');
+  g.selectAll('*').remove();
+
+  const svgEl = document.getElementById('tree-svg');
+  const W = svgEl.clientWidth || 800;
+  const H = svgEl.clientHeight || 600;
+
+  // Clone node objects so D3's simulation can mutate x/y without changing originals
+  const simNodes = nodes.map(n => ({ ...n }));
+  const nodeById = {};
+  simNodes.forEach(n => { nodeById[n.id] = n; });
+
+  const simLinks = links.map(l => ({ ...l }));
+
+  // Draw links first (below nodes)
+  const linkEls = g.selectAll('.link')
+    .data(simLinks)
+    .join('line')
+    .attr('class', d => `link ${d.linkClass}`);
+
+  // Node groups
+  const nodeGroups = g.selectAll('.node')
+    .data(simNodes)
+    .join('g')
+    .attr('class', d => `node ${d.data.deathDate ? 'deceased' : 'living'}`)
+    .style('cursor', 'pointer')
+    .on('click', (event, d) => {
+      event.stopPropagation();
+      showPersonDetail(d.data.id);
+    })
+    .call(d3.drag()
+      .on('start', (event, d) => {
+        if (!event.active) _forceSimulation.alphaTarget(0.3).restart();
+        d.fx = d.x;
+        d.fy = d.y;
+      })
+      .on('drag', (event, d) => {
+        d.fx = event.x;
+        d.fy = event.y;
+      })
+      .on('end', (event, d) => {
+        if (!event.active) _forceSimulation.alphaTarget(0);
+        d.fx = null;
+        d.fy = null;
+      })
+    );
+
+  nodeGroups.append('circle').attr('r', NODE_R);
+
+  // Clip paths for photos
+  const defs = _svg.append('defs');
+  simNodes.forEach((n, i) => {
+    defs.append('clipPath')
+      .attr('id', `force-clip-${i}`)
+      .append('circle')
+      .attr('r', NODE_R);
+  });
+
+  simNodes.forEach((n, i) => {
+    const safeUrl = sanitizeImageUrl(n.data.image);
+    if (safeUrl) {
+      nodeGroups.filter((d, j) => j === i)
+        .append('image')
+        .attr('href', safeUrl)
+        .attr('x', -NODE_R).attr('y', -NODE_R)
+        .attr('width', NODE_R * 2).attr('height', NODE_R * 2)
+        .attr('clip-path', `url(#force-clip-${i})`);
+    }
+  });
+
+  nodeGroups.append('text')
+    .attr('y', NODE_R + 16)
+    .attr('text-anchor', 'middle')
+    .text(d => truncate(d.data.name || '—', 20));
+
+  nodeGroups.append('text')
+    .attr('class', 'date-text')
+    .attr('y', NODE_R + 30)
+    .attr('text-anchor', 'middle')
+    .text(d => {
+      const parts = [];
+      if (d.data.birthDate) parts.push(d.data.birthDate.slice(0, 4));
+      if (d.data.deathDate) parts.push(d.data.deathDate.slice(0, 4));
+      return parts.join(' – ');
+    });
+
+  // Build force simulation with per-link strength
+  _forceSimulation = d3.forceSimulation(simNodes)
+    .force('link', d3.forceLink(simLinks)
+      .id(d => d.id)
+      .strength(d => d.strength)
+      .distance(H_SEP * 1.1))
+    .force('charge', d3.forceManyBody().strength(-300))
+    .force('center', d3.forceCenter(W / 2, H / 2))
+    .force('collide', d3.forceCollide(NODE_R + 10))
+    .on('tick', () => {
+      linkEls
+        .attr('x1', d => d.source.x)
+        .attr('y1', d => d.source.y)
+        .attr('x2', d => d.target.x)
+        .attr('y2', d => d.target.y);
+
+      nodeGroups
+        .attr('transform', d => `translate(${d.x},${d.y})`);
+    });
 }
 
 function clearTree(msg) {
