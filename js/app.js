@@ -137,6 +137,18 @@ function bindEvents() {
   // Tree render button
   document.getElementById('render-btn').addEventListener('click', renderTree);
 
+  // Hide root/depth controls for Force mode (they are irrelevant there)
+  document.getElementById('tree-mode-select').addEventListener('change', e => {
+    const isForce = e.target.value === 'force';
+    const rootLabel   = document.querySelector('#tree-controls label[for="root-select"]');
+    const depthLabel  = document.querySelector('#tree-controls label[for="depth-input"]');
+    const rootSel     = document.getElementById('root-select');
+    const depthInput  = document.getElementById('depth-input');
+    [rootLabel, rootSel, depthLabel, depthInput].forEach(el => {
+      if (el) el.style.display = isForce ? 'none' : '';
+    });
+  });
+
   // Edit modal save/delete
   document.getElementById('edit-save-btn').addEventListener('click', savePersonFromModal);
   document.getElementById('edit-delete-btn').addEventListener('click', () => {
