@@ -15,7 +15,7 @@
   --text-muted:  #8892a4;
   --living:      #4caf50;
   --deceased:    #e94560;
-  --marriage:    #57b8ff;
+  --marriage:    #FFD700;
   --divorced:    #ff9800;
   --partner:     #ab47bc;
   --adopted:     #26c6da;
@@ -167,7 +167,7 @@ button { cursor: pointer; font: inherit; }
 /* Link styles */
 .link { fill: none; stroke-width: 2; }
 .link.parent-child { stroke: var(--text-muted); stroke-dasharray: none; }
-.link.marriage { stroke: var(--marriage); }
+.link.marriage { stroke: var(--marriage); stroke-width: 4; }
 .link.divorced { stroke: var(--divorced); stroke-dasharray: 6,3; }
 .link.partner { stroke: var(--partner); stroke-dasharray: 4,4; }
 .link.adopted { stroke: var(--adopted); stroke-dasharray: 3,3; }
