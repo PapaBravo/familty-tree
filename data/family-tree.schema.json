@@ -1,0 +1,182 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/PapaBravo/familty-tree/blob/main/data/family-tree.schema.json",
+  "title": "FamilyTree",
+  "description": "A family tree export file containing the family name, a list of persons, and a list of partnerships between persons.",
+  "type": "object",
+  "required": ["persons"],
+  "additionalProperties": false,
+  "properties": {
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Human-readable name of this family dataset. Used as the display label in the family selector.",
+      "examples": ["Sample Family", "The Harrison Family"]
+    },
+    "persons": {
+      "type": "array",
+      "description": "List of all persons in the family tree. Each entry represents one individual.",
+      "items": { "$ref": "#/definitions/Person" },
+      "examples": [
+        [
+          {
+            "id": "p1",
+            "name": "George Harrison Sr.",
+            "description": "Patriarch of the Harrison family.",
+            "birthDate": "1920-03-15",
+            "deathDate": "1998-11-02",
+            "image": "",
+            "parents": []
+          }
+        ]
+      ]
+    },
+    "partnerships": {
+      "type": "array",
+      "description": "List of partnerships (marriages, civil unions, or informal partnerships) between persons. Optional — omit or supply an empty array when there are no partnerships to record.",
+      "items": { "$ref": "#/definitions/Partnership" },
+      "examples": [
+        [
+          {
+            "id": "pp1",
+            "person1Id": "p1",
+            "person2Id": "p2",
+            "type": "marriage",
+            "startDate": "1945-06-20"
+          }
+        ]
+      ]
+    }
+  },
+  "definitions": {
+    "Person": {
+      "title": "Person",
+      "description": "A single individual in the family tree.",
+      "type": "object",
+      "required": ["id", "name", "parents"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Unique identifier for this person within the dataset. Referenced by parent entries and partnerships.",
+          "examples": ["p1", "p12", "3f2504e0-4f89-11d3-9a0c-0305e82c3301"]
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Full display name of the person. May include maiden names in parentheses.",
+          "examples": ["George Harrison Sr.", "Susan Harrison (née Clark)"]
+        },
+        "birthDate": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+          "description": "Date of birth in ISO 8601 format (YYYY-MM-DD). Omit or use an empty string if unknown.",
+          "examples": ["1920-03-15", "1975-12-01"]
+        },
+        "deathDate": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+          "description": "Date of death in ISO 8601 format (YYYY-MM-DD). Omit or use an empty string if the person is still living or the date is unknown.",
+          "examples": ["1998-11-02", "2001-05-18"]
+        },
+        "description": {
+          "type": "string",
+          "description": "Free-text biographical notes about the person.",
+          "examples": ["Patriarch of the Harrison family. Worked as a carpenter for 40 years.", "Adopted son of Robert and Linda. Joined the family at age 3."]
+        },
+        "image": {
+          "type": "string",
+          "description": "Photo of the person. Must be either an HTTPS/HTTP URL or a base64-encoded data URI for PNG, JPEG, GIF, WebP, or SVG. Supply an empty string when no photo is available.",
+          "examples": [
+            "",
+            "https://example.com/photos/george.jpg",
+            "data:image/jpeg;base64,/9j/4AAQSkZJRgAB..."
+          ]
+        },
+        "parents": {
+          "type": "array",
+          "description": "List of parent references for this person. An empty array means no parents are recorded.",
+          "items": { "$ref": "#/definitions/ParentRef" },
+          "examples": [
+            [],
+            [
+              { "personId": "p1", "type": "father" },
+              { "personId": "p2", "type": "mother" }
+            ],
+            [
+              { "personId": "p3", "type": "adopted" },
+              { "personId": "p5", "type": "adopted" }
+            ]
+          ]
+        }
+      }
+    },
+    "ParentRef": {
+      "title": "ParentRef",
+      "description": "A reference from a child to one of their parents, together with the nature of that relationship.",
+      "type": "object",
+      "required": ["personId", "type"],
+      "additionalProperties": false,
+      "properties": {
+        "personId": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The `id` of the parent person in the same `persons` array.",
+          "examples": ["p1", "p2"]
+        },
+        "type": {
+          "type": "string",
+          "enum": ["mother", "father", "adopted"],
+          "description": "Nature of the parental relationship. Use `adopted` for adoptive parents regardless of gender.",
+          "examples": ["mother", "father", "adopted"]
+        }
+      }
+    },
+    "Partnership": {
+      "title": "Partnership",
+      "description": "A romantic or legal partnership between two persons in the family tree.",
+      "type": "object",
+      "required": ["id", "person1Id", "person2Id", "type"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Unique identifier for this partnership within the dataset.",
+          "examples": ["pp1", "pp7"]
+        },
+        "person1Id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The `id` of the first partner. Order is arbitrary.",
+          "examples": ["p1", "p7"]
+        },
+        "person2Id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The `id` of the second partner. Must differ from `person1Id`.",
+          "examples": ["p2", "p17"]
+        },
+        "type": {
+          "type": "string",
+          "enum": ["marriage", "divorced", "partner"],
+          "description": "Nature of the partnership. `marriage` — legally married (may have ended); `divorced` — marriage that ended in divorce; `partner` — unmarried/cohabiting partnership.",
+          "examples": ["marriage", "divorced", "partner"]
+        },
+        "startDate": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+          "description": "Date the partnership began (wedding date, move-in date, etc.) in ISO 8601 format (YYYY-MM-DD). Omit if unknown.",
+          "examples": ["1945-06-20", "2014-03-08"]
+        },
+        "endDate": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+          "description": "Date the partnership ended (divorce, death, separation) in ISO 8601 format (YYYY-MM-DD). Omit if the partnership is ongoing.",
+          "examples": ["1978-06-14", "2013-10-01"]
+        }
+      }
+    }
+  }
+}
