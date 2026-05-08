@@ -404,6 +404,7 @@ function addPartnershipRow(container, allPersons, ppId, selectedPartnerId, selec
   if (ppId) row.dataset.ppId = ppId;
 
   const personSel = document.createElement('select');
+  personSel.className = 'partner-select';
   personSel.innerHTML = '<option value="">— Select partner —</option>';
   allPersons.forEach(p => {
     if (_editingPersonId && p.id === _editingPersonId) return;
@@ -453,10 +454,8 @@ function collectPartnershipsFromEditor() {
   const rows = document.querySelectorAll('#partnerships-list .partnership-entry');
   const partnerships = [];
   rows.forEach(row => {
-    const selects = row.querySelectorAll('select');
-    const dates = row.querySelectorAll('.partnership-date');
-    const partnerId = selects[0].value;
-    const type = selects[1].value;
+    const partnerId = row.querySelector('.partner-select').value;
+    const type = row.querySelector('.type-select').value;
     const startDate = dates[0].value;
     const endDate = dates[1].value;
     if (partnerId) {
