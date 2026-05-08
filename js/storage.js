@@ -74,7 +74,9 @@ function deleteFamily(id) {
   deleteFamilyData(id);
   // Best-effort: delete all person images from IndexedDB (images.js loaded later)
   if (typeof deleteAllFamilyImages === 'function') {
-    deleteAllFamilyImages(id).catch(() => {});
+    deleteAllFamilyImages(id).catch(err => {
+      console.warn('Failed to delete family images from IndexedDB:', err);
+    });
   }
 }
 

@@ -275,11 +275,17 @@ function openEditModal(personId) {
 
 /** Show a preview image inside the upload area. */
 function _setPhotoPreview(src, showRemove) {
+  if (!src || typeof src !== 'string') return;
+  // Accept blob: URLs (from createObjectURL) or URLs already validated by sanitizeImageUrl
+  const isBlob = src.startsWith('blob:');
+  const safeSrc = isBlob ? src : sanitizeImageUrl(src);
+  if (!safeSrc) return;
+
   const previewEl = document.getElementById('photo-preview');
   const removeBtn = document.getElementById('photo-remove-btn');
   previewEl.innerHTML = '';
   const img = document.createElement('img');
-  img.src = src;
+  img.src = safeSrc;
   img.alt = 'Photo preview';
   previewEl.appendChild(img);
   removeBtn.style.display = showRemove ? '' : 'none';
@@ -428,12 +434,17 @@ function savePersonFromModal() {
   }
 
   Promise.all(imageOps).then(() => {
+    _clearPreviewObjectUrl();
+    const msg = _editingPersonId ? 'Person updated' : 'Person added';
     closeModal('edit-modal');
-    showToast(_editingPersonId ? 'Person updated' : 'Person added', 'success');
+    showToast(msg, 'success');
     window.app && window.app.refresh();
-  }).catch(() => {
+  }).catch(err => {
+    console.warn('Image operation failed:', err);
+    _clearPreviewObjectUrl();
+    const msg = _editingPersonId ? 'Person updated' : 'Person added';
     closeModal('edit-modal');
-    showToast(_editingPersonId ? 'Person updated' : 'Person added', 'success');
+    showToast(msg, 'success');
     window.app && window.app.refresh();
   });
 }

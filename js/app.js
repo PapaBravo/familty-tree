@@ -181,6 +181,10 @@ function bindEvents() {
     _clearDetailAvatarObjectUrl();
     closeModal('person-detail-modal');
   });
+  document.getElementById('detail-close-footer-btn').addEventListener('click', () => {
+    _clearDetailAvatarObjectUrl();
+    closeModal('person-detail-modal');
+  });
 
   // Photo upload in edit modal
   document.getElementById('photo-upload-btn').addEventListener('click', () => {
