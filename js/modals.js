@@ -250,6 +250,12 @@ function openEditModal(personId) {
   // Populate parents list
   buildParentsEditor(person ? (person.parents || []) : [], data ? data.persons : []);
 
+  // Populate partnerships list
+  const existingPartnerships = personId && data
+    ? (data.partnerships || []).filter(pp => pp.person1Id === personId || pp.person2Id === personId)
+    : [];
+  buildPartnershipsEditor(existingPartnerships, data ? data.persons : [], personId);
+
   openModal('edit-modal');
 
   // Load existing photo asynchronously (IDB first, then legacy URL)
@@ -378,6 +384,89 @@ function collectParentsFromEditor() {
   return parents;
 }
 
+function buildPartnershipsEditor(currentPartnerships, allPersons, personId) {
+  const container = document.getElementById('partnerships-list');
+  container.innerHTML = '';
+
+  currentPartnerships.forEach(pp => {
+    const partnerId = pp.person1Id === personId ? pp.person2Id : pp.person1Id;
+    addPartnershipRow(container, allPersons, pp.id, partnerId, pp.type, pp.startDate || '', pp.endDate || '');
+  });
+
+  document.getElementById('add-partnership-btn').onclick = () => {
+    addPartnershipRow(container, allPersons, null, '', 'marriage', '', '');
+  };
+}
+
+function addPartnershipRow(container, allPersons, ppId, selectedPartnerId, selectedType, startDate, endDate) {
+  const row = document.createElement('div');
+  row.className = 'partnership-entry';
+  if (ppId) row.dataset.ppId = ppId;
+
+  const personSel = document.createElement('select');
+  personSel.className = 'partner-select';
+  personSel.innerHTML = '<option value="">— Select partner —</option>';
+  allPersons.forEach(p => {
+    if (_editingPersonId && p.id === _editingPersonId) return;
+    const opt = document.createElement('option');
+    opt.value = p.id;
+    opt.textContent = p.name;
+    if (p.id === selectedPartnerId) opt.selected = true;
+    personSel.appendChild(opt);
+  });
+
+  const typeSel = document.createElement('select');
+  typeSel.className = 'type-select';
+  ['marriage', 'divorced', 'partner'].forEach(t => {
+    const opt = document.createElement('option');
+    opt.value = t;
+    opt.textContent = t;
+    if (t === selectedType) opt.selected = true;
+    typeSel.appendChild(opt);
+  });
+
+  const startInput = document.createElement('input');
+  startInput.type = 'date';
+  startInput.className = 'partnership-date';
+  startInput.value = startDate || '';
+  startInput.title = 'Start date';
+
+  const endInput = document.createElement('input');
+  endInput.type = 'date';
+  endInput.className = 'partnership-date';
+  endInput.value = endDate || '';
+  endInput.title = 'End date';
+
+  const removeBtn = document.createElement('button');
+  removeBtn.textContent = '✕';
+  removeBtn.title = 'Remove partnership';
+  removeBtn.onclick = () => row.remove();
+
+  row.appendChild(personSel);
+  row.appendChild(typeSel);
+  row.appendChild(startInput);
+  row.appendChild(endInput);
+  row.appendChild(removeBtn);
+  container.appendChild(row);
+}
+
+function collectPartnershipsFromEditor() {
+  const rows = document.querySelectorAll('#partnerships-list .partnership-entry');
+  const partnerships = [];
+  rows.forEach(row => {
+    const partnerId = row.querySelector('.partner-select').value;
+    const type = row.querySelector('.type-select').value;
+    const startDate = dates[0].value;
+    const endDate = dates[1].value;
+    if (partnerId) {
+      const entry = { partnerId, type, startDate, endDate };
+      if (row.dataset.ppId) entry.ppId = row.dataset.ppId;
+      partnerships.push(entry);
+    }
+  });
+  return partnerships;
+}
+
 function savePersonFromModal() {
   const activeId = getActiveId();
   if (!activeId) return;
@@ -425,6 +514,23 @@ function savePersonFromModal() {
   } else {
     data.persons.push({ id: personId, ...personData });
   }
+
+  // Update partnerships: replace all partnerships involving this person
+  const editorPartnerships = collectPartnershipsFromEditor();
+  data.partnerships = (data.partnerships || []).filter(
+    pp => pp.person1Id !== personId && pp.person2Id !== personId
+  );
+  editorPartnerships.forEach(ep => {
+    const pp = {
+      id: ep.ppId || generateId(),
+      person1Id: personId,
+      person2Id: ep.partnerId,
+      type: ep.type
+    };
+    if (ep.startDate) pp.startDate = ep.startDate;
+    if (ep.endDate) pp.endDate = ep.endDate;
+    data.partnerships.push(pp);
+  });
 
   saveFamilyData(activeId, data);
 

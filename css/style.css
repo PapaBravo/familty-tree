@@ -242,6 +242,21 @@ button { cursor: pointer; font: inherit; }
 .parent-entry .type-select { flex: 1; }
 .parent-entry button { background: var(--accent); color: #fff; border: none; border-radius: var(--radius); padding: 5px 10px; }
 
+/* Partnership list in edit modal */
+#partnerships-list { margin-top: 6px; }
+.partnership-entry {
+  display: flex; gap: 8px; align-items: center; margin-bottom: 8px; flex-wrap: wrap;
+}
+.partnership-entry select { flex: 2; min-width: 110px; }
+.partnership-entry .type-select { flex: 1; min-width: 90px; }
+.partnership-entry .partnership-date {
+  flex: 1; min-width: 120px;
+  padding: 8px 12px; background: var(--bg); color: var(--text);
+  border: 1px solid var(--surface2); border-radius: var(--radius); font: inherit;
+}
+.partnership-entry .partnership-date:focus { outline: none; border-color: var(--accent2); }
+.partnership-entry button { background: var(--accent); color: #fff; border: none; border-radius: var(--radius); padding: 5px 10px; }
+
 /* ---------- Person Detail Modal ------------------------- */
 .detail-header { display: flex; gap: 20px; align-items: flex-start; margin-bottom: 20px; }
 .detail-avatar {
