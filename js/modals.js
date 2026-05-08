@@ -469,7 +469,7 @@ function collectPartnershipsFromEditor() {
     }
   });
   if (hasIncomplete) {
-    showToast('One or more partnerships have no partner selected and were skipped', 'error');
+    showToast('One or more partnerships have no partner selected and will be skipped', 'error');
   }
   return partnerships;
 }
