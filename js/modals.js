@@ -453,17 +453,24 @@ function addPartnershipRow(container, allPersons, ppId, selectedPartnerId, selec
 function collectPartnershipsFromEditor() {
   const rows = document.querySelectorAll('#partnerships-list .partnership-entry');
   const partnerships = [];
+  let hasIncomplete = false;
   rows.forEach(row => {
     const partnerId = row.querySelector('.partner-select').value;
     const type = row.querySelector('.type-select').value;
-    const startDate = dates[0].value;
-    const endDate = dates[1].value;
+    const dates = row.querySelectorAll('.partnership-date');
+    const startDate = dates[0] ? dates[0].value : '';
+    const endDate = dates[1] ? dates[1].value : '';
     if (partnerId) {
       const entry = { partnerId, type, startDate, endDate };
       if (row.dataset.ppId) entry.ppId = row.dataset.ppId;
       partnerships.push(entry);
+    } else {
+      hasIncomplete = true;
     }
   });
+  if (hasIncomplete) {
+    showToast('One or more partnerships have no partner selected and will be skipped', 'error');
+  }
   return partnerships;
 }
 
