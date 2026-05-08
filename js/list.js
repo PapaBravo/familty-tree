@@ -43,7 +43,7 @@ function buildPersonCard(person, data) {
   const avatarDiv = document.createElement('div');
   avatarDiv.className = 'avatar';
   // Check IDB cache first (populated by app.js refresh()), then fall back to URL
-  const cachedUrl = typeof _imageCache !== 'undefined' ? _imageCache.get(person.id) : undefined;
+  const cachedUrl = _imageCache.get(person.id);
   const safeImgSrc = cachedUrl || sanitizeImageUrl(person.image);
   if (safeImgSrc) {
     const img = document.createElement('img');

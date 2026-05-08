@@ -314,7 +314,7 @@ function drawRenderGraph(graph) {
   });
 
   allNodes.forEach((n, i) => {
-    const cachedUrl = typeof _imageCache !== 'undefined' ? _imageCache.get(n.data.id) : undefined;
+    const cachedUrl = _imageCache.get(n.data.id);
     const safeUrl = cachedUrl || sanitizeImageUrl(n.data.image);
     if (safeUrl) {
       nodeGroups.filter((d, j) => j === i)
@@ -1071,7 +1071,7 @@ function drawForceGraph(graph) {
       .append('circle')
       .attr('r', NODE_R);
 
-    const cachedUrl = typeof _imageCache !== 'undefined' ? _imageCache.get(d.data.id) : undefined;
+    const cachedUrl = _imageCache.get(d.data.id);
     const safeUrl = cachedUrl || sanitizeImageUrl(d.data.image);
     if (safeUrl) {
       d3.select(this)

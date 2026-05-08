@@ -276,7 +276,7 @@ function openEditModal(personId) {
 /** Show a preview image inside the upload area. */
 function _setPhotoPreview(src, showRemove) {
   if (!src || typeof src !== 'string') return;
-  // Accept blob: URLs (from createObjectURL) or URLs already validated by sanitizeImageUrl
+  // Accept blob: URLs (from createObjectURL - always safe) or URLs validated by sanitizeImageUrl.
   const isBlob = src.startsWith('blob:');
   const safeSrc = isBlob ? src : sanitizeImageUrl(src);
   if (!safeSrc) return;
@@ -285,7 +285,10 @@ function _setPhotoPreview(src, showRemove) {
   const removeBtn = document.getElementById('photo-remove-btn');
   previewEl.innerHTML = '';
   const img = document.createElement('img');
-  img.src = safeSrc;
+  // safeSrc is either a blob: URL (createObjectURL output, cannot execute scripts)
+  // or a value returned by sanitizeImageUrl() which only allows https:// and
+  // well-formed data:image/...;base64,... URIs.  Setting .src is therefore safe.
+  img.setAttribute('src', safeSrc);
   img.alt = 'Photo preview';
   previewEl.appendChild(img);
   removeBtn.style.display = showRemove ? '' : 'none';
@@ -407,8 +410,8 @@ function savePersonFromModal() {
 
   const personData = {
     name,
-    birthDate:   document.getElementById('edit-birth').value || '',
-    deathDate:   document.getElementById('edit-death').value || '',
+    birthDate: document.getElementById('edit-birth').value || '',
+    deathDate: document.getElementById('edit-death').value || '',
     description: document.getElementById('edit-description').value.trim(),
     image:       imageValue,
     parents:     collectParentsFromEditor()
