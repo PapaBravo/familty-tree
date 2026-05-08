@@ -2,6 +2,10 @@
  * app.js – Application bootstrap, family management, import/export
  */
 
+// Global image object-URL cache: Map<personId, objectURL>
+// Populated before each render via refreshImageCache().
+let _imageCache = new Map();
+
 window.app = { refresh };
 
 /* -------------------------------------------------------
@@ -17,7 +21,7 @@ async function boot() {
   setActiveFamilyFromStorage();
   initList();
   initTree();
-  refresh();
+  await refresh();
   bindEvents();
 }
 
@@ -67,7 +71,24 @@ function setActiveFamilyFromStorage() {
 /* -------------------------------------------------------
    Refresh (re-render current view)
 ------------------------------------------------------- */
-function refresh() {
+async function refresh() {
+  // Revoke old object URLs to prevent memory leaks
+  _imageCache.forEach(url => URL.revokeObjectURL(url));
+  _imageCache = new Map();
+
+  const activeId = getActiveId();
+  if (activeId) {
+    const data = getFamilyData(activeId);
+    if (data && data.persons) {
+      const personIds = data.persons.map(p => p.id);
+      try {
+        _imageCache = await loadFamilyImageCache(activeId, personIds);
+      } catch (e) {
+        console.warn('Could not load image cache:', e);
+      }
+    }
+  }
+
   renderList();
   populateRootSelect();
   // Only re-render tree if it's visible
@@ -156,7 +177,21 @@ function bindEvents() {
     deletePersonFromModal();
   });
   document.getElementById('edit-cancel-btn').addEventListener('click', () => closeModal('edit-modal'));
-  document.getElementById('detail-close-btn').addEventListener('click', () => closeModal('person-detail-modal'));
+  document.getElementById('detail-close-btn').addEventListener('click', () => {
+    _clearDetailAvatarObjectUrl();
+    closeModal('person-detail-modal');
+  });
+  document.getElementById('detail-close-footer-btn').addEventListener('click', () => {
+    _clearDetailAvatarObjectUrl();
+    closeModal('person-detail-modal');
+  });
+
+  // Photo upload in edit modal
+  document.getElementById('photo-upload-btn').addEventListener('click', () => {
+    document.getElementById('photo-file-input').click();
+  });
+  document.getElementById('photo-file-input').addEventListener('change', handlePhotoFileChange);
+  document.getElementById('photo-remove-btn').addEventListener('click', handlePhotoRemove);
 
   // Export
   document.getElementById('export-btn').addEventListener('click', openExportModal);
@@ -169,6 +204,7 @@ function bindEvents() {
     );
   });
   document.getElementById('export-download-btn').addEventListener('click', downloadExport);
+  document.getElementById('export-zip-btn').addEventListener('click', downloadExportZip);
   document.getElementById('export-close-btn').addEventListener('click', () => closeModal('export-modal'));
 
   // Import
@@ -212,22 +248,117 @@ function downloadExport() {
   URL.revokeObjectURL(url);
 }
 
+async function downloadExportZip() {
+  const activeId = getActiveId();
+  if (!activeId) return;
+
+  const families = getFamilies();
+  const family = families.find(f => f.id === activeId);
+  const data = getFamilyData(activeId);
+  if (!data) return;
+
+  const exportObj = {
+    name: family ? family.name : 'Family',
+    ...data
+  };
+
+  const zip = new JSZip();
+  zip.file('family.json', JSON.stringify(exportObj, null, 2));
+
+  // Add images from IDB
+  const imageBlobs = await getAllFamilyImageBlobs(activeId);
+  if (imageBlobs.size > 0) {
+    const imgFolder = zip.folder('images');
+    imageBlobs.forEach((blob, personId) => {
+      const ext = imageExtension(blob);
+      imgFolder.file(`${personId}.${ext}`, blob);
+    });
+  }
+
+  const zipBlob = await zip.generateAsync({ type: 'blob' });
+  const url = URL.createObjectURL(zipBlob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${(family ? family.name : 'family').replace(/\s+/g, '_')}.zip`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast('ZIP downloaded', 'success');
+}
+
 /* -------------------------------------------------------
    Import
 ------------------------------------------------------- */
+// Stores image blobs extracted from a ZIP during file load,
+// keyed by person ID (from the images/ folder filename).
+let _pendingImportImages = new Map();
+
 function handleImportFile(e) {
   const file = e.target.files[0];
   if (!file) return;
-  const reader = new FileReader();
-  reader.onload = ev => {
-    document.getElementById('import-input').value = ev.target.result;
-  };
-  reader.readAsText(file);
+  _pendingImportImages = new Map();
+
+  if (file.name.toLowerCase().endsWith('.zip') || file.type === 'application/zip') {
+    _handleImportZip(file);
+  } else {
+    const reader = new FileReader();
+    reader.onload = ev => {
+      document.getElementById('import-input').value = ev.target.result;
+    };
+    reader.readAsText(file);
+  }
   // Reset input for re-selection
   e.target.value = '';
 }
 
-function doImport() {
+async function _handleImportZip(file) {
+  try {
+    const zip = await JSZip.loadAsync(file);
+
+    // Find the JSON file (must be at the top level)
+    let jsonContent = null;
+    zip.forEach((relativePath, entry) => {
+      if (!entry.dir && relativePath.split('/').length === 1 && relativePath.endsWith('.json')) {
+        if (jsonContent === null) {
+          jsonContent = entry.async('string');
+        }
+      }
+    });
+    if (!jsonContent) {
+      showToast('No JSON file found in ZIP', 'error');
+      return;
+    }
+    const jsonText = await jsonContent;
+    document.getElementById('import-input').value = jsonText;
+
+    // Extract images from the images/ folder
+    const imagePromises = [];
+    zip.forEach((relativePath, entry) => {
+      if (!entry.dir && relativePath.startsWith('images/')) {
+        const filename = relativePath.replace('images/', '');
+        const personId = filename.replace(/\.[^/.]+$/, ''); // strip extension
+        if (personId) {
+          imagePromises.push(
+            entry.async('blob').then(blob => {
+              // Infer MIME type from extension
+              const ext = filename.split('.').pop().toLowerCase();
+              const mimeMap = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', gif: 'image/gif', webp: 'image/webp' };
+              const mime = mimeMap[ext] || 'image/jpeg';
+              _pendingImportImages.set(personId, new Blob([blob], { type: mime }));
+            })
+          );
+        }
+      }
+    });
+    await Promise.all(imagePromises);
+    showToast(`ZIP loaded: ${_pendingImportImages.size} photo(s) found`, 'success');
+  } catch (err) {
+    showToast('Failed to read ZIP: ' + err.message, 'error');
+  }
+}
+
+async function doImport() {
   const raw = document.getElementById('import-input').value.trim();
   if (!raw) { showToast('Paste or load JSON first', 'error'); return; }
 
@@ -251,12 +382,25 @@ function doImport() {
   };
 
   const id = createFamily(name, data);
+
+  // Save any extracted images to IDB, keyed by the imported person IDs
+  if (_pendingImportImages.size > 0) {
+    const saveOps = [];
+    _pendingImportImages.forEach((blob, personId) => {
+      saveOps.push(savePersonImage(id, personId, blob));
+    });
+    await Promise.all(saveOps).catch(err => {
+      console.warn('Some images could not be saved:', err);
+    });
+    _pendingImportImages = new Map();
+  }
+
   setActiveId(id);
   populateFamilySelect();
   document.getElementById('family-select').value = id;
   document.getElementById('import-input').value = '';
   closeModal('import-modal');
-  refresh();
+  await refresh();
   showToast(`Imported "${name}"`, 'success');
 }
 

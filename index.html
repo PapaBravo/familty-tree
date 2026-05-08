@@ -142,7 +142,7 @@
     </div>
     <div class="modal-footer">
       <button class="nav-btn primary" id="detail-edit-btn">✏ Edit</button>
-      <button class="nav-btn" id="detail-close-footer-btn" onclick="closeModal('person-detail-modal')">Close</button>
+      <button class="nav-btn" id="detail-close-footer-btn">Close</button>
     </div>
   </div>
 </div>
@@ -174,8 +174,15 @@
         <textarea id="edit-description" placeholder="Short biography…"></textarea>
       </div>
       <div class="form-group">
-        <label for="edit-image">Photo URL (https:// or data:image/…)</label>
-        <input id="edit-image" type="url" placeholder="https://example.com/photo.jpg" />
+        <label>Photo</label>
+        <div class="photo-upload-area" id="photo-upload-area">
+          <div class="photo-preview" id="photo-preview"></div>
+          <div class="photo-upload-controls">
+            <button type="button" class="nav-btn" id="photo-upload-btn">📷 Upload photo…</button>
+            <button type="button" class="nav-btn danger" id="photo-remove-btn" style="display:none">✕ Remove</button>
+          </div>
+          <input type="file" id="photo-file-input" accept="image/jpeg,image/png,image/gif,image/webp" style="display:none" />
+        </div>
       </div>
       <div class="form-group">
         <label>Parents</label>
@@ -200,12 +207,13 @@
       <button class="modal-close" id="export-close-btn">✕</button>
     </div>
     <div class="modal-body">
-      <p style="margin-bottom:12px;color:var(--text-muted)">Copy or download the JSON below to back up or share this family.</p>
+      <p style="margin-bottom:12px;color:var(--text-muted)">Copy or download the JSON below to back up or share this family. Use <strong>Download ZIP</strong> to include uploaded photos.</p>
       <textarea id="export-output" readonly></textarea>
     </div>
     <div class="modal-footer">
       <button class="nav-btn" id="export-copy-btn">📋 Copy</button>
       <button class="nav-btn primary" id="export-download-btn">⬇ Download JSON</button>
+      <button class="nav-btn primary" id="export-zip-btn">📦 Download ZIP</button>
     </div>
   </div>
 </div>
@@ -218,9 +226,9 @@
       <button class="modal-close" onclick="closeModal('import-modal')">✕</button>
     </div>
     <div class="modal-body">
-      <p style="margin-bottom:12px;color:var(--text-muted)">Paste JSON below or load from a file. This creates a new family entry.</p>
+      <p style="margin-bottom:12px;color:var(--text-muted)">Load a <strong>.zip</strong> (with photos) or a plain <strong>.json</strong> file, or paste JSON below. This creates a new family entry.</p>
       <button class="nav-btn" id="import-file-btn" style="margin-bottom:10px">📂 Load from file…</button>
-      <input type="file" id="import-file-input" accept=".json,application/json" style="display:none" />
+      <input type="file" id="import-file-input" accept=".json,.zip,application/json,application/zip" style="display:none" />
       <textarea id="import-input" placeholder='{"name":"My Family","persons":[...],"partnerships":[]}'></textarea>
     </div>
     <div class="modal-footer">
@@ -233,8 +241,11 @@
 <!-- ===== Scripts ============================================= -->
 <!-- D3 v7 (vendored locally) -->
 <script src="js/vendor/d3.min.js"></script>
+<!-- JSZip (vendored locally) -->
+<script src="js/vendor/jszip.min.js"></script>
 
 <!-- App scripts -->
+<script src="js/images.js"></script>
 <script src="js/storage.js"></script>
 <script src="js/modals.js"></script>
 <script src="js/list.js"></script>

@@ -34,6 +34,16 @@ document.addEventListener('keydown', e => {
 /* -------------------------------------------------------
    Person Detail Modal
 ------------------------------------------------------- */
+// Object URL created for the detail modal avatar (blob from IDB)
+let _detailAvatarObjectUrl = null;
+
+function _clearDetailAvatarObjectUrl() {
+  if (_detailAvatarObjectUrl) {
+    URL.revokeObjectURL(_detailAvatarObjectUrl);
+    _detailAvatarObjectUrl = null;
+  }
+}
+
 function showPersonDetail(personId) {
   const data = getFamilyData(getActiveId());
   if (!data) return;
@@ -42,15 +52,50 @@ function showPersonDetail(personId) {
 
   document.getElementById('detail-name').textContent = person.name || '—';
 
-  // Avatar
+  // Avatar – load from IDB first, fall back to URL
   const avatarEl = document.getElementById('detail-avatar');
   avatarEl.innerHTML = '';
-  if (person.image) {
-    const img = document.createElement('img');
-    img.src = sanitizeImageUrl(person.image);
-    img.alt = person.name;
-    avatarEl.appendChild(img);
-  } else {
+  _clearDetailAvatarObjectUrl();
+  getPersonImage(getActiveId(), personId).then(blob => {
+    if (blob) {
+      _clearDetailAvatarObjectUrl();
+      _detailAvatarObjectUrl = URL.createObjectURL(blob);
+      const img = document.createElement('img');
+      img.src = _detailAvatarObjectUrl;
+      img.alt = person.name;
+      avatarEl.innerHTML = '';
+      avatarEl.appendChild(img);
+    } else if (person.image) {
+      const safeUrl = sanitizeImageUrl(person.image);
+      if (safeUrl) {
+        const img = document.createElement('img');
+        img.src = safeUrl;
+        img.alt = person.name;
+        avatarEl.innerHTML = '';
+        avatarEl.appendChild(img);
+      } else {
+        avatarEl.textContent = getInitials(person.name);
+      }
+    } else {
+      avatarEl.textContent = getInitials(person.name);
+    }
+  }).catch(() => {
+    if (person.image) {
+      const safeUrl = sanitizeImageUrl(person.image);
+      if (safeUrl) {
+        const img = document.createElement('img');
+        img.src = safeUrl;
+        img.alt = person.name;
+        avatarEl.appendChild(img);
+      } else {
+        avatarEl.textContent = getInitials(person.name);
+      }
+    } else {
+      avatarEl.textContent = getInitials(person.name);
+    }
+  });
+  // Show initials immediately as a placeholder while loading
+  if (!avatarEl.firstChild) {
     avatarEl.textContent = getInitials(person.name);
   }
 
@@ -166,9 +211,26 @@ function showPersonDetail(personId) {
    Person Edit / Create Modal
 ------------------------------------------------------- */
 let _editingPersonId = null;
+// Tracks a newly-selected image file before saving (null = no pending upload)
+let _pendingImageFile = null;
+// Tracks whether the user explicitly removed the current image
+let _imageRemoved = false;
+// Tracks object URL created for the modal preview (for cleanup)
+let _previewObjectUrl = null;
+
+function _clearPreviewObjectUrl() {
+  if (_previewObjectUrl) {
+    URL.revokeObjectURL(_previewObjectUrl);
+    _previewObjectUrl = null;
+  }
+}
 
 function openEditModal(personId) {
   _editingPersonId = personId || null;
+  _pendingImageFile = null;
+  _imageRemoved = false;
+  _clearPreviewObjectUrl();
+
   const data = getFamilyData(getActiveId());
   const person = personId && data ? data.persons.find(p => p.id === personId) : null;
 
@@ -177,12 +239,82 @@ function openEditModal(personId) {
   document.getElementById('edit-birth').value = person ? (person.birthDate || '') : '';
   document.getElementById('edit-death').value = person ? (person.deathDate || '') : '';
   document.getElementById('edit-description').value = person ? (person.description || '') : '';
-  document.getElementById('edit-image').value = person ? (person.image || '') : '';
+
+  // Reset photo UI
+  const previewEl = document.getElementById('photo-preview');
+  const removeBtn = document.getElementById('photo-remove-btn');
+  previewEl.innerHTML = '';
+  removeBtn.style.display = 'none';
+  document.getElementById('photo-file-input').value = '';
 
   // Populate parents list
   buildParentsEditor(person ? (person.parents || []) : [], data ? data.persons : []);
 
   openModal('edit-modal');
+
+  // Load existing photo asynchronously (IDB first, then legacy URL)
+  if (personId) {
+    const activeId = getActiveId();
+    getPersonImage(activeId, personId).then(blob => {
+      if (blob) {
+        _clearPreviewObjectUrl();
+        _previewObjectUrl = URL.createObjectURL(blob);
+        _setPhotoPreview(_previewObjectUrl, true);
+      } else if (person && person.image) {
+        const safeUrl = sanitizeImageUrl(person.image);
+        if (safeUrl) _setPhotoPreview(safeUrl, false);
+      }
+    }).catch(() => {
+      if (person && person.image) {
+        const safeUrl = sanitizeImageUrl(person.image);
+        if (safeUrl) _setPhotoPreview(safeUrl, false);
+      }
+    });
+  }
+}
+
+/** Show a preview image inside the upload area. */
+function _setPhotoPreview(src, showRemove) {
+  if (!src || typeof src !== 'string') return;
+  // Accept blob: URLs (from createObjectURL - always safe) or URLs validated by sanitizeImageUrl.
+  const isBlob = src.startsWith('blob:');
+  const safeSrc = isBlob ? src : sanitizeImageUrl(src);
+  if (!safeSrc) return;
+
+  const previewEl = document.getElementById('photo-preview');
+  const removeBtn = document.getElementById('photo-remove-btn');
+  previewEl.innerHTML = '';
+  const img = document.createElement('img');
+  // safeSrc is either a blob: URL (createObjectURL output, cannot execute scripts)
+  // or a value returned by sanitizeImageUrl() which only allows https:// and
+  // well-formed data:image/...;base64,... URIs.  Setting .src is therefore safe.
+  img.setAttribute('src', safeSrc);
+  img.alt = 'Photo preview';
+  previewEl.appendChild(img);
+  removeBtn.style.display = showRemove ? '' : 'none';
+}
+
+/** Called when the user picks a file. */
+function handlePhotoFileChange(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  _clearPreviewObjectUrl();
+  _pendingImageFile = file;
+  _imageRemoved = false;
+  _previewObjectUrl = URL.createObjectURL(file);
+  _setPhotoPreview(_previewObjectUrl, true);
+}
+
+/** Called when the user clicks "Remove". */
+function handlePhotoRemove() {
+  _clearPreviewObjectUrl();
+  _pendingImageFile = null;
+  _imageRemoved = true;
+  const previewEl = document.getElementById('photo-preview');
+  const removeBtn = document.getElementById('photo-remove-btn');
+  previewEl.innerHTML = '';
+  removeBtn.style.display = 'none';
+  document.getElementById('photo-file-input').value = '';
 }
 
 function buildParentsEditor(currentParents, allPersons) {
@@ -258,13 +390,31 @@ function savePersonFromModal() {
     return;
   }
 
+  // Determine the person ID (existing or new)
+  const personId = _editingPersonId || generateId();
+
+  // Determine image field value:
+  // - If a new file was picked → will save to IDB, clear image URL field
+  // - If image was removed → clear image URL and delete from IDB
+  // - Otherwise keep existing image field unchanged
+  let imageValue;
+  if (_editingPersonId) {
+    const existing = data.persons.find(p => p.id === _editingPersonId);
+    imageValue = existing ? (existing.image || '') : '';
+  } else {
+    imageValue = '';
+  }
+  if (_pendingImageFile || _imageRemoved) {
+    imageValue = '';
+  }
+
   const personData = {
     name,
     birthDate: document.getElementById('edit-birth').value || '',
     deathDate: document.getElementById('edit-death').value || '',
     description: document.getElementById('edit-description').value.trim(),
-    image: document.getElementById('edit-image').value.trim(),
-    parents: collectParentsFromEditor()
+    image:       imageValue,
+    parents:     collectParentsFromEditor()
   };
 
   if (_editingPersonId) {
@@ -273,13 +423,33 @@ function savePersonFromModal() {
       data.persons[idx] = { ...data.persons[idx], ...personData };
     }
   } else {
-    data.persons.push({ id: generateId(), ...personData });
+    data.persons.push({ id: personId, ...personData });
   }
 
   saveFamilyData(activeId, data);
-  closeModal('edit-modal');
-  showToast(_editingPersonId ? 'Person updated' : 'Person added', 'success');
-  window.app && window.app.refresh();
+
+  // Handle image blob operations asynchronously, then refresh
+  const imageOps = [];
+  if (_pendingImageFile) {
+    imageOps.push(savePersonImage(activeId, personId, _pendingImageFile));
+  } else if (_imageRemoved && _editingPersonId) {
+    imageOps.push(deletePersonImage(activeId, _editingPersonId));
+  }
+
+  Promise.all(imageOps).then(() => {
+    _clearPreviewObjectUrl();
+    const msg = _editingPersonId ? 'Person updated' : 'Person added';
+    closeModal('edit-modal');
+    showToast(msg, 'success');
+    window.app && window.app.refresh();
+  }).catch(err => {
+    console.warn('Image operation failed:', err);
+    _clearPreviewObjectUrl();
+    const msg = _editingPersonId ? 'Person updated' : 'Person added';
+    closeModal('edit-modal');
+    showToast(msg, 'success');
+    window.app && window.app.refresh();
+  });
 }
 
 function deletePersonFromModal() {
@@ -288,18 +458,22 @@ function deletePersonFromModal() {
   const data = getFamilyData(activeId);
   if (!data) return;
 
+  const deletedId = _editingPersonId;
+
   // Remove from persons
-  data.persons = data.persons.filter(p => p.id !== _editingPersonId);
+  data.persons = data.persons.filter(p => p.id !== deletedId);
   // Remove parent refs
   data.persons.forEach(p => {
-    p.parents = (p.parents || []).filter(pr => pr.personId !== _editingPersonId);
+    p.parents = (p.parents || []).filter(pr => pr.personId !== deletedId);
   });
   // Remove partnerships
   data.partnerships = (data.partnerships || []).filter(
-    pp => pp.person1Id !== _editingPersonId && pp.person2Id !== _editingPersonId
+    pp => pp.person1Id !== deletedId && pp.person2Id !== deletedId
   );
 
   saveFamilyData(activeId, data);
+  // Best-effort delete image from IDB
+  deletePersonImage(activeId, deletedId).catch(() => {});
   closeModal('edit-modal');
   showToast('Person deleted', 'success');
   window.app && window.app.refresh();
