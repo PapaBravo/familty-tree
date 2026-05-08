@@ -72,6 +72,10 @@ function deleteFamily(id) {
   const families = getFamilies().filter(f => f.id !== id);
   saveFamilies(families);
   deleteFamilyData(id);
+  // Best-effort: delete all person images from IndexedDB (images.js loaded later)
+  if (typeof deleteAllFamilyImages === 'function') {
+    deleteAllFamilyImages(id).catch(() => {});
+  }
 }
 
 function generateId() {
