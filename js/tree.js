@@ -1000,10 +1000,36 @@ function buildForceRenderGraph(data) {
     });
   });
 
+  // Hidden gravity node: one edge per person with a birthdate, strength proportional to birth year
+  const GRAVITY_NODE_ID = '__gravity__';
+  nodes.push({ id: GRAVITY_NODE_ID, data: null, isHidden: true });
+
+  const birthYears = persons
+    .map(p => p.birthDate ? parseInt(p.birthDate.slice(0, 4), 10) : null)
+    .filter(y => y !== null && !isNaN(y));
+  const minYear = birthYears.length ? Math.min(...birthYears) : 1900;
+  const maxYear = birthYears.length ? Math.max(...birthYears) : 2000;
+  const yearRange = maxYear > minYear ? maxYear - minYear : 1;
+
+  const gravityLinks = [];
+  persons.forEach(p => {
+    if (!p.birthDate) return;
+    const year = parseInt(p.birthDate.slice(0, 4), 10);
+    if (isNaN(year)) return;
+    const strength = 0.05 + 0.45 * (year - minYear) / yearRange;
+    gravityLinks.push({
+      source: GRAVITY_NODE_ID,
+      target: p.id,
+      linkClass: 'gravity',
+      strength,
+      isGravity: true
+    });
+  });
+
   return {
     renderMode: 'force',
     nodes,
-    links: partnershipLinks.concat(parentChildLinks)
+    links: partnershipLinks.concat(parentChildLinks).concat(gravityLinks)
   };
 }
 
@@ -1022,17 +1048,24 @@ function drawForceGraph(graph) {
   const nodeById = {};
   simNodes.forEach(n => { nodeById[n.id] = n; });
 
+  // Fix hidden gravity node at the center so it acts as an anchor
+  simNodes.forEach(n => {
+    if (n.isHidden) { n.fx = W / 2; n.fy = H / 2; }
+  });
+
   const simLinks = links.map(l => ({ ...l }));
 
-  // Draw links first (below nodes)
+  // Draw only visible (non-gravity) links
+  const visibleLinks = simLinks.filter(l => !l.isGravity);
   const linkEls = g.selectAll('.link')
-    .data(simLinks)
+    .data(visibleLinks)
     .join('line')
     .attr('class', d => `link ${d.linkClass}`);
 
-  // Node groups
+  // Node groups (exclude hidden nodes)
+  const visibleNodes = simNodes.filter(n => !n.isHidden);
   const nodeGroups = g.selectAll('.node')
-    .data(simNodes)
+    .data(visibleNodes)
     .join('g')
     .attr('class', d => `node ${d.data.deathDate ? 'deceased' : 'living'}`)
     .style('cursor', 'pointer')
