@@ -1004,27 +1004,26 @@ function buildForceRenderGraph(data) {
   const GRAVITY_NODE_ID = '__gravity__';
   nodes.push({ id: GRAVITY_NODE_ID, data: null, isHidden: true });
 
-  const birthYears = persons
-    .map(p => p.birthDate ? parseInt(p.birthDate.slice(0, 4), 10) : null)
-    .filter(y => y !== null && !isNaN(y));
-  const minYear = birthYears.length ? Math.min(...birthYears) : 1900;
-  const maxYear = birthYears.length ? Math.max(...birthYears) : 2000;
+  // Parse birth years once; persons without a valid birthdate are excluded from gravity links
+  const personBirthYears = persons.map(p => ({
+    person: p,
+    year: p.birthDate ? parseInt(p.birthDate.slice(0, 4), 10) : NaN
+  })).filter(({ year }) => !isNaN(year));
+
+  const years = personBirthYears.map(({ year }) => year);
+  const minYear = years.length ? Math.min(...years) : 1900;
+  const maxYear = years.length ? Math.max(...years) : 2000;
+  // When all persons share the same birth year, treat the range as 1 to avoid division by zero;
+  // in that edge case every gravity link receives the minimum strength (0.05).
   const yearRange = maxYear > minYear ? maxYear - minYear : 1;
 
-  const gravityLinks = [];
-  persons.forEach(p => {
-    if (!p.birthDate) return;
-    const year = parseInt(p.birthDate.slice(0, 4), 10);
-    if (isNaN(year)) return;
-    const strength = 0.05 + 0.45 * (year - minYear) / yearRange;
-    gravityLinks.push({
-      source: GRAVITY_NODE_ID,
-      target: p.id,
-      linkClass: 'gravity',
-      strength,
-      isGravity: true
-    });
-  });
+  const gravityLinks = personBirthYears.map(({ person, year }) => ({
+    source: GRAVITY_NODE_ID,
+    target: person.id,
+    linkClass: 'gravity',
+    strength: 0.05 + 0.45 * (year - minYear) / yearRange,
+    isGravity: true
+  }));
 
   return {
     renderMode: 'force',
@@ -1050,7 +1049,7 @@ function drawForceGraph(graph) {
 
   // Fix hidden gravity node at the center so it acts as an anchor
   simNodes.forEach(n => {
-    if (n.isHidden) { n.fx = W / 2; n.fy = H / 2; }
+    if (n.id === '__gravity__') { n.fx = W / 2; n.fy = H / 2; }
   });
 
   const simLinks = links.map(l => ({ ...l }));
@@ -1062,7 +1061,7 @@ function drawForceGraph(graph) {
     .join('line')
     .attr('class', d => `link ${d.linkClass}`);
 
-  // Node groups (exclude hidden nodes)
+  // Node groups (exclude hidden gravity node)
   const visibleNodes = simNodes.filter(n => !n.isHidden);
   const nodeGroups = g.selectAll('.node')
     .data(visibleNodes)
