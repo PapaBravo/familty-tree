@@ -316,27 +316,37 @@ async function _handleImportZip(file) {
   try {
     const zip = await JSZip.loadAsync(file);
 
-    // Find the JSON file (must be at the top level)
-    let jsonContent = null;
+    // Find the shallowest JSON file in the ZIP (supports both flat ZIPs and
+    // ZIPs where everything is wrapped inside a single top-level folder, as
+    // is common when compressing a folder on Ubuntu/Linux).
+    let jsonEntry = null;
+    let jsonDepth = Infinity;
     zip.forEach((relativePath, entry) => {
-      if (!entry.dir && relativePath.split('/').length === 1 && relativePath.endsWith('.json')) {
-        if (jsonContent === null) {
-          jsonContent = entry.async('string');
+      if (!entry.dir && relativePath.endsWith('.json')) {
+        const depth = relativePath.split('/').length;
+        if (depth < jsonDepth) {
+          jsonDepth = depth;
+          jsonEntry = { path: relativePath, entry };
         }
       }
     });
-    if (!jsonContent) {
+    if (!jsonEntry) {
       showToast('No JSON file found in ZIP', 'error');
       return;
     }
-    const jsonText = await jsonContent;
+
+    // Determine the base directory prefix (e.g. "" or "my_family/")
+    const basePath = jsonEntry.path.substring(0, jsonEntry.path.lastIndexOf('/') + 1);
+
+    const jsonText = await jsonEntry.entry.async('string');
     document.getElementById('import-input').value = jsonText;
 
-    // Extract images from the images/ folder
+    // Extract images from the images/ folder relative to the JSON location
+    const imagesPrefix = basePath + 'images/';
     const imagePromises = [];
     zip.forEach((relativePath, entry) => {
-      if (!entry.dir && relativePath.startsWith('images/')) {
-        const filename = relativePath.replace('images/', '');
+      if (!entry.dir && relativePath.startsWith(imagesPrefix)) {
+        const filename = relativePath.slice(imagesPrefix.length);
         const personId = filename.replace(/\.[^/.]+$/, ''); // strip extension
         if (personId) {
           imagePromises.push(
