@@ -233,21 +233,33 @@ button { cursor: pointer; font: inherit; }
 .form-row { display: flex; gap: 12px; }
 .form-row .form-group { flex: 1; }
 
+/* Person picker widget (search + sorted select) */
+.person-picker {
+  display: flex; flex-direction: column; gap: 4px; flex: 2;
+}
+.person-picker-search {
+  padding: 6px 10px; background: var(--bg); color: var(--text);
+  border: 1px solid var(--surface2); border-radius: var(--radius); font: inherit;
+  width: 100%;
+}
+.person-picker-search:focus { outline: none; border-color: var(--accent2); }
+.person-picker select { flex: unset; width: 100%; }
+
 /* Parent list in edit modal */
 #parents-list { margin-top: 6px; }
 .parent-entry {
-  display: flex; gap: 8px; align-items: center; margin-bottom: 8px;
+  display: flex; gap: 8px; align-items: flex-start; margin-bottom: 8px;
 }
-.parent-entry select { flex: 2; }
+.parent-entry .person-picker { flex: 2; }
 .parent-entry .type-select { flex: 1; }
 .parent-entry button { background: var(--accent); color: #fff; border: none; border-radius: var(--radius); padding: 5px 10px; }
 
 /* Partnership list in edit modal */
 #partnerships-list { margin-top: 6px; }
 .partnership-entry {
-  display: flex; gap: 8px; align-items: center; margin-bottom: 8px; flex-wrap: wrap;
+  display: flex; gap: 8px; align-items: flex-start; margin-bottom: 8px; flex-wrap: wrap;
 }
-.partnership-entry select { flex: 2; min-width: 110px; }
+.partnership-entry .person-picker { flex: 2; min-width: 110px; }
 .partnership-entry .type-select { flex: 1; min-width: 90px; }
 .partnership-entry .partnership-date {
   flex: 1; min-width: 120px;

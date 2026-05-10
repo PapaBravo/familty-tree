@@ -323,6 +323,53 @@ function handlePhotoRemove() {
   document.getElementById('photo-file-input').value = '';
 }
 
+/**
+ * Creates a person picker widget: a search input that filters a sorted <select>.
+ * The returned element is a .person-picker div containing the search input and
+ * the <select>. Pass extraClass to add an extra class to the <select>.
+ */
+function createPersonPicker(allPersons, selectedId, placeholder, extraClass) {
+  const sorted = [...allPersons]
+    .filter(p => !(_editingPersonId && p.id === _editingPersonId))
+    .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+
+  const wrapper = document.createElement('div');
+  wrapper.className = 'person-picker';
+
+  const searchInput = document.createElement('input');
+  searchInput.type = 'search';
+  searchInput.className = 'person-picker-search';
+  searchInput.placeholder = 'Filter by name…';
+  searchInput.autocomplete = 'off';
+
+  const sel = document.createElement('select');
+  if (extraClass) sel.className = extraClass;
+
+  function populateOptions(filter) {
+    const currentValue = sel.value;
+    sel.innerHTML = `<option value="">${placeholder}</option>`;
+    const q = (filter || '').trim().toLowerCase();
+    sorted.forEach(p => {
+      if (!q || (p.name || '').toLowerCase().includes(q)) {
+        const opt = document.createElement('option');
+        opt.value = p.id;
+        opt.textContent = p.name;
+        if (String(p.id) === String(currentValue || selectedId)) opt.selected = true;
+        sel.appendChild(opt);
+      }
+    });
+  }
+
+  populateOptions('');
+
+  searchInput.addEventListener('input', () => populateOptions(searchInput.value));
+
+  wrapper.appendChild(searchInput);
+  wrapper.appendChild(sel);
+
+  return wrapper;
+}
+
 function buildParentsEditor(currentParents, allPersons) {
   const container = document.getElementById('parents-list');
   container.innerHTML = '';
@@ -340,16 +387,7 @@ function addParentRow(container, allPersons, selectedId, selectedType) {
   const row = document.createElement('div');
   row.className = 'parent-entry';
 
-  const personSel = document.createElement('select');
-  personSel.innerHTML = '<option value="">— Select person —</option>';
-  allPersons.forEach(p => {
-    if (_editingPersonId && p.id === _editingPersonId) return;
-    const opt = document.createElement('option');
-    opt.value = p.id;
-    opt.textContent = p.name;
-    if (p.id === selectedId) opt.selected = true;
-    personSel.appendChild(opt);
-  });
+  const picker = createPersonPicker(allPersons, selectedId, '— Select person —');
 
   const typeSel = document.createElement('select');
   typeSel.className = 'type-select';
@@ -366,7 +404,7 @@ function addParentRow(container, allPersons, selectedId, selectedType) {
   removeBtn.title = 'Remove parent';
   removeBtn.onclick = () => row.remove();
 
-  row.appendChild(personSel);
+  row.appendChild(picker);
   row.appendChild(typeSel);
   row.appendChild(removeBtn);
   container.appendChild(row);
@@ -376,9 +414,8 @@ function collectParentsFromEditor() {
   const rows = document.querySelectorAll('#parents-list .parent-entry');
   const parents = [];
   rows.forEach(row => {
-    const selects = row.querySelectorAll('select');
-    const personId = selects[0].value;
-    const type = selects[1].value;
+    const personId = row.querySelector('.person-picker select').value;
+    const type = row.querySelector('.type-select').value;
     if (personId) parents.push({ personId, type });
   });
   return parents;
@@ -403,17 +440,7 @@ function addPartnershipRow(container, allPersons, ppId, selectedPartnerId, selec
   row.className = 'partnership-entry';
   if (ppId) row.dataset.ppId = ppId;
 
-  const personSel = document.createElement('select');
-  personSel.className = 'partner-select';
-  personSel.innerHTML = '<option value="">— Select partner —</option>';
-  allPersons.forEach(p => {
-    if (_editingPersonId && p.id === _editingPersonId) return;
-    const opt = document.createElement('option');
-    opt.value = p.id;
-    opt.textContent = p.name;
-    if (p.id === selectedPartnerId) opt.selected = true;
-    personSel.appendChild(opt);
-  });
+  const picker = createPersonPicker(allPersons, selectedPartnerId, '— Select partner —', 'partner-select');
 
   const typeSel = document.createElement('select');
   typeSel.className = 'type-select';
@@ -442,7 +469,7 @@ function addPartnershipRow(container, allPersons, ppId, selectedPartnerId, selec
   removeBtn.title = 'Remove partnership';
   removeBtn.onclick = () => row.remove();
 
-  row.appendChild(personSel);
+  row.appendChild(picker);
   row.appendChild(typeSel);
   row.appendChild(startInput);
   row.appendChild(endInput);
