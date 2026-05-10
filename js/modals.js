@@ -615,12 +615,13 @@ function getInitials(name) {
  * A person is considered deceased when they have a recorded deathDate, or
  * when their birthDate indicates they were born more than 110 years ago.
  */
+const _currentYear = new Date().getFullYear();
 function isAssumedDeceased(person) {
   if (!person) return false;
   if (person.deathDate) return true;
   if (person.birthDate) {
     const birthYear = new Date(person.birthDate + 'T00:00:00').getFullYear();
-    if (!isNaN(birthYear) && (new Date().getFullYear() - birthYear) > 110) return true;
+    if (!isNaN(birthYear) && (_currentYear - birthYear) > 110) return true;
   }
   return false;
 }
