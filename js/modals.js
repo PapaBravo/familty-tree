@@ -106,7 +106,7 @@ function showPersonDetail(personId) {
 
   // Status badge
   const statusEl = document.getElementById('detail-status');
-  if (person.deathDate) {
+  if (isAssumedDeceased(person)) {
     statusEl.textContent = 'Deceased';
     statusEl.className = 'badge deceased';
   } else {
@@ -608,6 +608,22 @@ function deletePersonFromModal() {
 function getInitials(name) {
   if (!name) return '?';
   return name.trim().split(/\s+/).map(w => w[0].toUpperCase()).join('').slice(0, 2);
+}
+
+/**
+ * Returns true if a person should be rendered as deceased.
+ * A person is considered deceased when they have a recorded deathDate, or
+ * when their birthDate indicates they were born more than 110 years ago.
+ */
+const _currentYear = new Date().getFullYear();
+function isAssumedDeceased(person) {
+  if (!person) return false;
+  if (person.deathDate) return true;
+  if (person.birthDate) {
+    const birthYear = new Date(person.birthDate + 'T00:00:00').getFullYear();
+    if (!isNaN(birthYear) && (_currentYear - birthYear) > 110) return true;
+  }
+  return false;
 }
 
 function formatDate(dateStr) {
