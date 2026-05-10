@@ -294,7 +294,7 @@ function drawRenderGraph(graph) {
   const nodeGroups = g.selectAll('.node')
     .data(allNodes)
     .join('g')
-    .attr('class', d => `node ${d.data.deathDate ? 'deceased' : 'living'}`)
+    .attr('class', d => `node ${isAssumedDeceased(d.data) ? 'deceased' : 'living'}`)
     .attr('transform', d => `translate(${d.x},${d.y})`)
     .style('cursor', 'pointer')
     .on('click', (event, d) => {
@@ -433,7 +433,7 @@ function isCurrentPartnership(partnership, personById) {
   const p1 = personById[partnership.person1Id];
   const p2 = personById[partnership.person2Id];
   if (!p1 || !p2) return false;
-  if (p1.deathDate || p2.deathDate) return false;
+  if (isAssumedDeceased(p1) || isAssumedDeceased(p2)) return false;
   return true;
 }
 
@@ -1034,7 +1034,7 @@ function drawForceGraph(graph) {
   const nodeGroups = g.selectAll('.node')
     .data(simNodes)
     .join('g')
-    .attr('class', d => `node ${d.data.deathDate ? 'deceased' : 'living'}`)
+    .attr('class', d => `node ${isAssumedDeceased(d.data) ? 'deceased' : 'living'}`)
     .style('cursor', 'pointer')
     .on('click', (event, d) => {
       event.stopPropagation();

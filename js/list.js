@@ -70,7 +70,7 @@ function buildPersonCard(person, data) {
 
   // Status badge
   const badge = document.createElement('span');
-  if (person.deathDate) {
+  if (isAssumedDeceased(person)) {
     badge.className = 'badge deceased';
     badge.textContent = 'Deceased';
   } else {
