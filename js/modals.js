@@ -324,9 +324,9 @@ function handlePhotoRemove() {
 }
 
 /**
- * Creates a person picker widget: a search input that filters a sorted <select>.
- * The returned element is a .person-picker div containing the search input and
- * the <select>. Pass extraClass to add an extra class to the <select>.
+ * Creates a person picker widget: a sorted <select>.
+ * The returned element is a .person-picker div containing the <select>.
+ * Pass extraClass to add an extra class to the <select>.
  */
 function createPersonPicker(allPersons, selectedId, placeholder, extraClass) {
   const sorted = [...allPersons]
@@ -336,35 +336,18 @@ function createPersonPicker(allPersons, selectedId, placeholder, extraClass) {
   const wrapper = document.createElement('div');
   wrapper.className = 'person-picker';
 
-  const searchInput = document.createElement('input');
-  searchInput.type = 'search';
-  searchInput.className = 'person-picker-search';
-  searchInput.placeholder = 'Filter by name…';
-  searchInput.autocomplete = 'off';
-
   const sel = document.createElement('select');
   if (extraClass) sel.className = extraClass;
 
-  function populateOptions(filter) {
-    const currentValue = sel.value;
-    sel.innerHTML = `<option value="">${placeholder}</option>`;
-    const q = (filter || '').trim().toLowerCase();
-    sorted.forEach(p => {
-      if (!q || (p.name || '').toLowerCase().includes(q)) {
-        const opt = document.createElement('option');
-        opt.value = p.id;
-        opt.textContent = p.name;
-        if (String(p.id) === String(currentValue || selectedId)) opt.selected = true;
-        sel.appendChild(opt);
-      }
-    });
-  }
+  sel.innerHTML = `<option value="">${placeholder}</option>`;
+  sorted.forEach(p => {
+    const opt = document.createElement('option');
+    opt.value = p.id;
+    opt.textContent = p.name;
+    if (String(p.id) === String(selectedId)) opt.selected = true;
+    sel.appendChild(opt);
+  });
 
-  populateOptions('');
-
-  searchInput.addEventListener('input', () => populateOptions(searchInput.value));
-
-  wrapper.appendChild(searchInput);
   wrapper.appendChild(sel);
 
   return wrapper;

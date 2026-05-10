@@ -237,12 +237,6 @@ button { cursor: pointer; font: inherit; }
 .person-picker {
   display: flex; flex-direction: column; gap: 4px; flex: 2;
 }
-.person-picker-search {
-  padding: 6px 10px; background: var(--bg); color: var(--text);
-  border: 1px solid var(--surface2); border-radius: var(--radius); font: inherit;
-  width: 100%;
-}
-.person-picker-search:focus { outline: none; border-color: var(--accent2); }
 .person-picker select { flex: unset; width: 100%; }
 
 /* Parent list in edit modal */
