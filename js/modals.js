@@ -354,7 +354,7 @@ function createPersonPicker(allPersons, selectedId, placeholder, extraClass) {
         const opt = document.createElement('option');
         opt.value = p.id;
         opt.textContent = p.name;
-        if (p.id === (currentValue || selectedId)) opt.selected = true;
+        if (String(p.id) === String(currentValue || selectedId)) opt.selected = true;
         sel.appendChild(opt);
       }
     });
