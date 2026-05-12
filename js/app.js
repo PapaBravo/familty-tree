@@ -96,6 +96,12 @@ async function refresh() {
   if (treePanel && treePanel.classList.contains('active')) {
     renderTree();
   }
+  // Only re-render map if it's visible
+  const mapPanel = document.getElementById('map-panel');
+  if (mapPanel && mapPanel.classList.contains('active')) {
+    initMap();
+    renderMap();
+  }
 }
 
 /* -------------------------------------------------------
@@ -110,6 +116,7 @@ function bindEvents() {
       btn.classList.add('active');
       document.getElementById(btn.dataset.panel).classList.add('active');
       if (btn.dataset.panel === 'tree-panel') renderTree();
+      if (btn.dataset.panel === 'map-panel') { initMap(); renderMap(); }
     });
   });
 

@@ -314,6 +314,61 @@ button { cursor: pointer; font: inherit; }
 #toast.success { background: rgba(76,175,80,.9); }
 #toast.error { background: rgba(233,69,96,.9); }
 
+/* ---------- Map Panel ----------------------------------- */
+#map-panel { overflow: hidden; }
+
+#map-controls {
+  display: flex; align-items: center; gap: 14px; padding: 10px 20px;
+  background: var(--surface); border-bottom: 1px solid var(--surface2);
+  flex-wrap: wrap;
+}
+#map-status { color: var(--text-muted); font-size: .9rem; }
+
+#map-container { flex: 1; min-height: 0; }
+
+/* Leaflet Leaflet map background */
+.leaflet-container { background: var(--bg); }
+
+/* Person marker circle */
+.map-marker-circle {
+  width: 44px; height: 44px; border-radius: 50%;
+  border: 3px solid #4caf50;
+  background: var(--surface2);
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0,0,0,.5);
+  transition: transform .15s;
+}
+.map-marker-circle:hover { transform: scale(1.15); }
+.map-marker-circle img {
+  width: 100%; height: 100%; object-fit: cover; border-radius: 50%;
+}
+.map-marker-circle span {
+  color: var(--text); font-size: .8rem; font-weight: 600;
+  user-select: none;
+}
+
+/* Popup */
+.map-popup { font-size: .9rem; min-width: 140px; }
+.map-popup-name {
+  font-weight: 700; font-size: 1rem; color: var(--accent2);
+  text-decoration: none; display: block; margin-bottom: 3px;
+}
+.map-popup-name:hover { color: var(--accent); }
+.map-popup-type { font-size: .78rem; color: #888; margin-bottom: 2px; }
+.map-popup-place { font-style: italic; margin-bottom: 4px; }
+.map-popup-desc { font-size: .82rem; color: #666; margin-top: 4px; }
+
+/* Override Leaflet popup styles to match dark theme */
+.leaflet-popup-content-wrapper {
+  background: var(--surface); color: var(--text);
+  border: 1px solid var(--surface2); border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+.leaflet-popup-tip { background: var(--surface); }
+.leaflet-popup-close-button { color: var(--text-muted) !important; }
+.leaflet-popup-close-button:hover { color: var(--accent) !important; }
+
 /* ---------- Responsive ---------------------------------- */
 @media (max-width: 600px) {
   #navbar { padding: 8px 12px; }

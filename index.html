@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Family Tree</title>
   <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="js/vendor/leaflet.min.css" />
 </head>
 <body>
 <div id="app">
@@ -31,6 +32,7 @@
   <div id="tabs">
     <button class="tab-btn active" data-panel="list-panel">📋 List</button>
     <button class="tab-btn" data-panel="tree-panel">🌿 Tree</button>
+    <button class="tab-btn" data-panel="map-panel">🗺 Map</button>
   </div>
 
   <!-- ===== Panels ============================================== -->
@@ -100,6 +102,15 @@
           </div>
         </div>
       </div>
+    </div>
+
+    <!-- Map Panel -->
+    <div id="map-panel" class="panel">
+      <div id="map-controls">
+        <button id="map-mode-btn" class="nav-btn" title="Switch to heatmap view" onclick="toggleMapMode()">🌡 Heatmap</button>
+        <span id="map-status"></span>
+      </div>
+      <div id="map-container"></div>
     </div>
 
   </div><!-- /panels -->
@@ -248,6 +259,9 @@
 <script src="js/vendor/d3.min.js"></script>
 <!-- JSZip (vendored locally) -->
 <script src="js/vendor/jszip.min.js"></script>
+<!-- Leaflet (vendored locally) -->
+<script src="js/vendor/leaflet.min.js"></script>
+<script src="js/vendor/leaflet-heat.js"></script>
 
 <!-- App scripts -->
 <script src="js/images.js"></script>
@@ -255,6 +269,7 @@
 <script src="js/modals.js"></script>
 <script src="js/list.js"></script>
 <script src="js/tree.js"></script>
+<script src="js/map.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>

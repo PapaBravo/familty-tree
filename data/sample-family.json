@@ -8,7 +8,19 @@
       "birthDate": "1920-03-15",
       "deathDate": "1998-11-02",
       "image": "",
-      "parents": []
+      "parents": [],
+      "places": [
+        {
+          "type": "birth",
+          "name": "Greifswald",
+          "coordinates": { "lat": 54.08605, "lon": 13.40808 }
+        },
+        {
+          "type": "lived",
+          "name": "Hamburg, Germany",
+          "description": "Worked as a carpenter in Hamburg for most of his career"
+        }
+      ]
     },
     {
       "id": "p2",
@@ -17,7 +29,19 @@
       "birthDate": "1923-07-04",
       "deathDate": "2001-05-18",
       "image": "",
-      "parents": []
+      "parents": [],
+      "places": [
+        {
+          "type": "birth",
+          "name": "Edinburgh",
+          "coordinates": { "lat": 55.9533, "lon": -3.1883 }
+        },
+        {
+          "type": "lived",
+          "name": "London, UK",
+          "description": "Moved to London after the war"
+        }
+      ]
     },
     {
       "id": "p3",
@@ -28,6 +52,17 @@
       "parents": [
         { "personId": "p1", "type": "father" },
         { "personId": "p2", "type": "mother" }
+      ],
+      "places": [
+        {
+          "type": "birth",
+          "name": "London, UK"
+        },
+        {
+          "type": "lived",
+          "name": "New York, USA",
+          "description": "Relocated for an engineering contract in the 1980s"
+        }
       ]
     },
     {
@@ -56,6 +91,17 @@
       "parents": [
         { "personId": "p3", "type": "father" },
         { "personId": "p4", "type": "mother" }
+      ],
+      "places": [
+        {
+          "type": "birth",
+          "name": "New York, USA"
+        },
+        {
+          "type": "lived",
+          "name": "San Francisco, USA",
+          "description": "Worked at a tech startup in the early 2000s"
+        }
       ]
     },
     {
@@ -67,6 +113,22 @@
       "parents": [
         { "personId": "p3", "type": "father" },
         { "personId": "p5", "type": "mother" }
+      ],
+      "places": [
+        {
+          "type": "birth",
+          "name": "New York, USA"
+        },
+        {
+          "type": "lived",
+          "name": "Edinburgh",
+          "coordinates": { "lat": 55.9533, "lon": -3.1883 },
+          "description": "Studied veterinary medicine at the University of Edinburgh 2000–2005"
+        },
+        {
+          "type": "lived",
+          "name": "Berlin, Germany"
+        }
       ]
     },
     {
