@@ -613,16 +613,52 @@ function getInitials(name) {
 /**
  * Returns true if a person should be rendered as deceased.
  * A person is considered deceased when they have a recorded deathDate, or
- * when their birthDate indicates they were born more than 110 years ago.
+ * when their birthDate indicates they were born more than 110 years ago,
+ * or when any of their children were born at least 90 years ago,
+ * or when any spouse is presumed dead by birth date (spouses with only a
+ * recorded deathDate do not trigger this – only age-based presumption does).
  */
 const _currentYear = new Date().getFullYear();
+
+/** Returns true when a person's own birth date implies they are over 110. */
+function _isAssumedDeceasedByBirthDate(person) {
+  if (!person || !person.birthDate) return false;
+  const birthYear = new Date(person.birthDate + 'T00:00:00').getFullYear();
+  return !isNaN(birthYear) && (_currentYear - birthYear) > 110;
+}
+
 function isAssumedDeceased(person) {
   if (!person) return false;
   if (person.deathDate) return true;
-  if (person.birthDate) {
-    const birthYear = new Date(person.birthDate + 'T00:00:00').getFullYear();
-    if (!isNaN(birthYear) && (_currentYear - birthYear) > 110) return true;
+  if (_isAssumedDeceasedByBirthDate(person)) return true;
+
+  // Look up family context for relationship-based heuristics.
+  const activeId = getActiveId();
+  const data = activeId ? getFamilyData(activeId) : null;
+  if (data) {
+    const persons = data.persons || [];
+    const partnerships = data.partnerships || [];
+
+    // Assume dead if any child was born at least 90 years ago.
+    const hasOldChild = persons.some(p => {
+      if (!(p.parents || []).some(pr => pr.personId === person.id)) return false;
+      if (!p.birthDate) return false;
+      const by = new Date(p.birthDate + 'T00:00:00').getFullYear();
+      return !isNaN(by) && (_currentYear - by) >= 90;
+    });
+    if (hasOldChild) return true;
+
+    // Assume dead if any spouse is presumed dead by birth date (born > 110 years ago).
+    const spouseIds = partnerships
+      .filter(pp => pp.person1Id === person.id || pp.person2Id === person.id)
+      .map(pp => pp.person1Id === person.id ? pp.person2Id : pp.person1Id);
+    const hasPresumedDeadSpouse = spouseIds.some(sid => {
+      const spouse = persons.find(p => p.id === sid);
+      return spouse && _isAssumedDeceasedByBirthDate(spouse);
+    });
+    if (hasPresumedDeadSpouse) return true;
   }
+
   return false;
 }
 
