@@ -109,6 +109,67 @@
               { "personId": "p5", "type": "adopted" }
             ]
           ]
+        },
+        "places": {
+          "type": "array",
+          "description": "List of notable places associated with this person (birth, death, residence, work, etc.). Coordinates are added automatically when geocoding is performed.",
+          "items": { "$ref": "#/definitions/Place" },
+          "examples": [
+            [
+              { "type": "birth", "name": "Hamburg, Germany", "coordinates": { "lat": 53.5753, "lon": 10.0153 } },
+              { "type": "lived", "name": "Berlin, Germany", "description": "Moved here in 1970" }
+            ]
+          ]
+        }
+      }
+    },
+    "Place": {
+      "title": "Place",
+      "description": "A notable place associated with a person, such as a birthplace, residence, or workplace.",
+      "type": "object",
+      "required": ["type", "name"],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["birth", "death", "lived", "work", "other"],
+          "description": "Category of the place. `birth` — birthplace; `death` — place of death; `lived` — place of residence; `work` — workplace; `other` — any other notable place.",
+          "examples": ["birth", "lived", "work"]
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Human-readable name of the place, used for display and geocoding.",
+          "examples": ["Hamburg, Germany", "Edinburgh", "New York, USA"]
+        },
+        "description": {
+          "type": "string",
+          "description": "Optional free-text note about the person's connection to this place.",
+          "examples": ["Worked as a carpenter here for 20 years."]
+        },
+        "coordinates": { "$ref": "#/definitions/Coordinates" }
+      }
+    },
+    "Coordinates": {
+      "title": "Coordinates",
+      "description": "Geographic coordinates (WGS 84) for a place. Populated automatically by the geocoding step.",
+      "type": "object",
+      "required": ["lat", "lon"],
+      "additionalProperties": false,
+      "properties": {
+        "lat": {
+          "type": "number",
+          "minimum": -90,
+          "maximum": 90,
+          "description": "Latitude in decimal degrees.",
+          "examples": [53.5753, 55.9533]
+        },
+        "lon": {
+          "type": "number",
+          "minimum": -180,
+          "maximum": 180,
+          "description": "Longitude in decimal degrees.",
+          "examples": [10.0153, -3.1883]
         }
       }
     },

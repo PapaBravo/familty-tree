@@ -185,13 +185,28 @@ async function renderMap() {
 
   // Geocode entries that have no coordinates (with rate limiting)
   let geocodingCount = 0;
+  let geocodingUpdated = false;
   for (const entry of rawEntries) {
     if (entry.coords) continue;
     geocodingCount++;
     statusEl.textContent = `Geocoding ${geocodingCount}…`;
     entry.coords = await geocodePlace(entry.place.name);
+    if (entry.coords) {
+      // Write coordinates back into the place object so they are persisted
+      entry.place.coordinates = { lat: entry.coords.lat, lon: entry.coords.lon };
+      geocodingUpdated = true;
+    }
     // Nominatim requests up to 1 per second for fair-use; 1.1 s between calls
     await new Promise(r => setTimeout(r, 1100));
+  }
+
+  // Persist newly geocoded coordinates back into the family data JSON
+  if (geocodingUpdated && data && activeId) {
+    try {
+      saveFamilyData(activeId, data);
+    } catch (e) {
+      console.warn('Could not persist geocoded coordinates to family data:', e);
+    }
   }
 
   // Keep only entries that resolved to coordinates
