@@ -1,5 +1,11 @@
 {
+  "scripts": {
+    "build": "node build.js",
+    "clean": "node -e \"require('fs').rmSync('js/vendor', {recursive:true, force:true})\""
+  },
   "dependencies": {
+    "d3": "^7.9.0",
+    "jszip": "^3.10.1",
     "leaflet": "^1.9.4",
     "leaflet.heat": "^0.2.0"
   }
