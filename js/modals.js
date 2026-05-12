@@ -648,14 +648,13 @@ function isAssumedDeceased(person) {
     });
     if (hasOldChild) return true;
 
-    // Assume dead if any spouse is presumed dead by birth date alone.
-    // A spouse with only a deathDate does not trigger this rule.
+    // Assume dead if any spouse is presumed dead by birth date (born > 110 years ago).
     const spouseIds = partnerships
       .filter(pp => pp.person1Id === person.id || pp.person2Id === person.id)
       .map(pp => pp.person1Id === person.id ? pp.person2Id : pp.person1Id);
     const hasPresumedDeadSpouse = spouseIds.some(sid => {
       const spouse = persons.find(p => p.id === sid);
-      return spouse && !spouse.deathDate && _isAssumedDeceasedByBirthDate(spouse);
+      return spouse && _isAssumedDeceasedByBirthDate(spouse);
     });
     if (hasPresumedDeadSpouse) return true;
   }
