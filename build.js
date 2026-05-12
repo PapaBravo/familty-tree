@@ -49,14 +49,14 @@ copy(
 );
 
 // leaflet JS + CSS + images
-// The npm package ships leaflet.js / leaflet.css (no separate .min files)
+// The npm package ships leaflet.js / leaflet.css (no separate minified variants)
 copy(
   path.join(nm, 'leaflet', 'dist', 'leaflet.js'),
-  path.join(vendorDir, 'leaflet.min.js')
+  path.join(vendorDir, 'leaflet.js')
 );
 copy(
   path.join(nm, 'leaflet', 'dist', 'leaflet.css'),
-  path.join(vendorDir, 'leaflet.min.css')
+  path.join(vendorDir, 'leaflet.css')
 );
 copyDir(
   path.join(nm, 'leaflet', 'dist', 'images'),
