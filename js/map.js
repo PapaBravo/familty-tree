@@ -7,6 +7,17 @@
  */
 
 /* -------------------------------------------------------
+   HTML escaping helper
+------------------------------------------------------- */
+function _esc(str) {
+  return (str || '').replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+/* -------------------------------------------------------
    Geocoding cache (localStorage)
 ------------------------------------------------------- */
 const GEOCODE_CACHE_KEY = 'familyTree_geocodeCache';
@@ -96,9 +107,9 @@ function _buildMarkerIcon(person) {
 
   let inner;
   if (safeImgSrc) {
-    inner = `<img src="${safeImgSrc}" alt="${(person.name || '').replace(/"/g, '&quot;')}" />`;
+    inner = `<img src="${safeImgSrc}" alt="${_esc(person.name)}" />`;
   } else {
-    inner = `<span>${getInitials(person.name)}</span>`;
+    inner = `<span>${_esc(getInitials(person.name))}</span>`;
   }
 
   return L.divIcon({
@@ -220,16 +231,31 @@ function _renderMarkers(entries) {
     const icon = _buildMarkerIcon(person);
     const marker = L.marker([coords.lat, coords.lon], { icon, title: person.name });
 
-    const escapedId = person.id.replace(/'/g, "\\'");
     const popupHtml = `
-      <div class="map-popup">
-        <a href="#" class="map-popup-name" onclick="showPersonDetail('${escapedId}');return false;">${person.name || '—'}</a>
-        <div class="map-popup-type">${_placeTypeLabel(place.type)}</div>
-        <div class="map-popup-place">${place.name || ''}</div>
-        ${place.description ? `<div class="map-popup-desc">${place.description}</div>` : ''}
+      <div class="map-popup" data-person-id="${_esc(person.id)}">
+        <a href="#" class="map-popup-name">${_esc(person.name || '—')}</a>
+        <div class="map-popup-type">${_esc(_placeTypeLabel(place.type))}</div>
+        <div class="map-popup-place">${_esc(place.name || '')}</div>
+        ${place.description ? `<div class="map-popup-desc">${_esc(place.description)}</div>` : ''}
       </div>`;
 
     marker.bindPopup(popupHtml, { maxWidth: 240 });
+    // Attach click handler after popup opens to avoid inline JS in HTML
+    marker.on('popupopen', () => {
+      const popup = marker.getPopup();
+      if (!popup) return;
+      const el = popup.getElement();
+      if (!el) return;
+      const link = el.querySelector('.map-popup-name');
+      const container = el.querySelector('.map-popup[data-person-id]');
+      if (link && container) {
+        const pid = container.dataset.personId;
+        link.addEventListener('click', e => {
+          e.preventDefault();
+          showPersonDetail(pid);
+        });
+      }
+    });
     _markerLayer.addLayer(marker);
   }
 }
