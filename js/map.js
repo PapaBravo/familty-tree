@@ -18,9 +18,13 @@ function _esc(str) {
 }
 
 /* -------------------------------------------------------
-   Geocoding cache (localStorage)
+   Geocoding cache (in-memory + localStorage)
 ------------------------------------------------------- */
 const GEOCODE_CACHE_KEY = 'familyTree_geocodeCache';
+
+// In-memory cache to avoid redundant localStorage reads and duplicate API calls
+// within the same page session.
+const _geocodeMemoryCache = new Map();
 
 function _loadGeocodeCache() {
   try {
@@ -38,15 +42,26 @@ function _saveGeocodeCache(cache) {
 
 /**
  * Geocode a place name via Nominatim (OpenStreetMap).
- * Results are cached in localStorage to avoid repeated requests.
+ * Results are cached first in memory (for the current session) and then in
+ * localStorage (across sessions) to avoid repeated API requests.
  * Returns {lat, lon} or null if not found.
  */
 async function geocodePlace(name) {
   if (!name || !name.trim()) return null;
-  const cache = _loadGeocodeCache();
   const key = name.trim().toLowerCase();
-  if (Object.prototype.hasOwnProperty.call(cache, key)) return cache[key];
 
+  // 1. In-memory cache (fastest – no I/O)
+  if (_geocodeMemoryCache.has(key)) return _geocodeMemoryCache.get(key);
+
+  // 2. localStorage cache (persistent across sessions)
+  const lsCache = _loadGeocodeCache();
+  if (Object.prototype.hasOwnProperty.call(lsCache, key)) {
+    _geocodeMemoryCache.set(key, lsCache[key]);
+    return lsCache[key];
+  }
+
+  // 3. External API call
+  console.info(`Geocoding "${name}" via Nominatim...`);
   try {
     const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(name)}&format=json&limit=1`;
     const resp = await fetch(url, {
@@ -60,8 +75,9 @@ async function geocodePlace(name) {
     const coords = results.length > 0
       ? { lat: parseFloat(results[0].lat), lon: parseFloat(results[0].lon) }
       : null;
-    cache[key] = coords;
-    _saveGeocodeCache(cache);
+    _geocodeMemoryCache.set(key, coords);
+    lsCache[key] = coords;
+    _saveGeocodeCache(lsCache);
     return coords;
   } catch (e) {
     console.warn(`Geocoding failed for "${name}":`, e);
@@ -186,18 +202,33 @@ async function renderMap() {
   // Geocode entries that have no coordinates (with rate limiting)
   let geocodingCount = 0;
   let geocodingUpdated = false;
+  // Load localStorage cache once so we can determine cache-hit status for the
+  // rate-limit decision without calling _loadGeocodeCache() per entry.
+  const lsCacheSnapshot = _loadGeocodeCache();
   for (const entry of rawEntries) {
     if (entry.coords) continue;
     geocodingCount++;
     statusEl.textContent = `Geocoding ${geocodingCount}…`;
-    entry.coords = await geocodePlace(entry.place.name);
+    // A result is "cached" (no API call needed) when it's already in memory or
+    // in localStorage.  We check both before calling geocodePlace so we know
+    // whether to apply Nominatim's fair-use rate-limit delay afterwards.
+    const placeName = entry.place.name;
+    const cacheKey = placeName ? placeName.trim().toLowerCase() : '';
+    const wasCached = cacheKey && (
+      _geocodeMemoryCache.has(cacheKey) ||
+      Object.prototype.hasOwnProperty.call(lsCacheSnapshot, cacheKey)
+    );
+    entry.coords = await geocodePlace(placeName);
     if (entry.coords) {
       // Write coordinates back into the place object so they are persisted
       entry.place.coordinates = { lat: entry.coords.lat, lon: entry.coords.lon };
       geocodingUpdated = true;
     }
-    // Nominatim requests up to 1 per second for fair-use; 1.1 s between calls
-    await new Promise(r => setTimeout(r, 1100));
+    // Nominatim fair-use: max 1 request per second. Skip the delay when the
+    // result was served from cache (no API call was made).
+    if (!wasCached) {
+      await new Promise(r => setTimeout(r, 1100));
+    }
   }
 
   // Persist newly geocoded coordinates back into the family data JSON
