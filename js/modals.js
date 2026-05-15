@@ -256,6 +256,9 @@ function openEditModal(personId) {
     : [];
   buildPartnershipsEditor(existingPartnerships, data ? data.persons : [], personId);
 
+  // Populate places list
+  buildPlacesEditor(person ? (person.places || []) : []);
+
   openModal('edit-modal');
 
   // Load existing photo asynchronously (IDB first, then legacy URL)
@@ -484,7 +487,86 @@ function collectPartnershipsFromEditor() {
   return partnerships;
 }
 
-function savePersonFromModal() {
+/**
+ * Merges newly-edited places with the previously-saved ones to preserve any
+ * cached coordinates so Nominatim lookups are not thrown away on save.
+ */
+function _mergePlacesWithCoordinates(newPlaces, oldPlaces) {
+  const oldByKey = new Map();
+  (oldPlaces || []).forEach(p => {
+    if (p.name && p.coordinates) {
+      oldByKey.set(p.name.trim().toLowerCase(), p.coordinates);
+    }
+  });
+  return newPlaces.map(p => {
+    const key = p.name.trim().toLowerCase();
+    const coords = oldByKey.get(key);
+    return coords ? { ...p, coordinates: coords } : p;
+  });
+}
+
+function buildPlacesEditor(currentPlaces) {
+  const container = document.getElementById('places-list');
+  container.innerHTML = '';
+
+  (currentPlaces || []).forEach(place => {
+    addPlaceRow(container, place.type || 'birth', place.name || '', place.description || '');
+  });
+
+  document.getElementById('add-place-btn').onclick = () => {
+    addPlaceRow(container, 'birth', '', '');
+  };
+}
+
+function addPlaceRow(container, selectedType, name, description) {
+  const row = document.createElement('div');
+  row.className = 'place-entry';
+
+  const typeSel = document.createElement('select');
+  typeSel.className = 'place-type-select';
+  [
+    { value: 'birth', label: '🎂 Birth' },
+    { value: 'death', label: '✝ Death' },
+    { value: 'lived', label: '🏠 Lived' },
+    { value: 'work',  label: '💼 Work' },
+    { value: 'other', label: '📍 Other' }
+  ].forEach(({ value, label }) => {
+    const opt = document.createElement('option');
+    opt.value = value;
+    opt.textContent = label;
+    if (value === selectedType) opt.selected = true;
+    typeSel.appendChild(opt);
+  });
+
+  const nameInput = document.createElement('input');
+  nameInput.type = 'text';
+  nameInput.className = 'place-name-input';
+  nameInput.placeholder = 'Place name';
+  nameInput.value = name;
+
+  const removeBtn = document.createElement('button');
+  removeBtn.textContent = '✕';
+  removeBtn.title = 'Remove place';
+  removeBtn.onclick = () => row.remove();
+
+  row.appendChild(typeSel);
+  row.appendChild(nameInput);
+  row.appendChild(removeBtn);
+  container.appendChild(row);
+}
+
+function collectPlacesFromEditor() {
+  const rows = document.querySelectorAll('#places-list .place-entry');
+  const places = [];
+  rows.forEach(row => {
+    const type = row.querySelector('.place-type-select').value;
+    const name = row.querySelector('.place-name-input').value.trim();
+    if (name) places.push({ type, name });
+  });
+  return places;
+}
+
+
   const activeId = getActiveId();
   if (!activeId) return;
 
@@ -520,7 +602,9 @@ function savePersonFromModal() {
     deathDate: document.getElementById('edit-death').value || '',
     description: document.getElementById('edit-description').value.trim(),
     image:       imageValue,
-    parents:     collectParentsFromEditor()
+    parents:     collectParentsFromEditor(),
+    places:      _mergePlacesWithCoordinates(collectPlacesFromEditor(),
+                   _editingPersonId ? (data.persons.find(p => p.id === _editingPersonId) || {}).places : [])
   };
 
   if (_editingPersonId) {
