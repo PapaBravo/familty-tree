@@ -3,7 +3,7 @@
  *
  * Uses Leaflet.js for rendering, OpenStreetMap tiles,
  * Nominatim for geocoding places without coordinates,
- * and Leaflet.heat for heatmap mode.
+ * and Leaflet.markercluster for clustering co-located markers.
  */
 
 /* -------------------------------------------------------
@@ -89,12 +89,8 @@ async function geocodePlace(name) {
    Map state
 ------------------------------------------------------- */
 let _map = null;
-let _markerLayer = null;
-let _heatLayer = null;
-let _mapMode = 'markers';   // 'markers' | 'heat'
-let _mapModeManual = false; // true once the user has toggled manually
+let _clusterLayer = null;
 let _mapRendering = false;
-const HEAT_THRESHOLD = 15;  // auto-switch to heat when total place entries exceed this
 
 /* -------------------------------------------------------
    Initialisation
@@ -109,7 +105,7 @@ function initMap() {
     maxZoom: 19
   }).addTo(_map);
 
-  _markerLayer = L.layerGroup().addTo(_map);
+  _clusterLayer = L.markerClusterGroup().addTo(_map);
 }
 
 /* -------------------------------------------------------
@@ -158,7 +154,7 @@ function _placeTypeLabel(type) {
 
 /**
  * Main render entry point – collect all place entries with coordinates
- * (geocoding those that lack them), then render markers or heatmap.
+ * (geocoding those that lack them), then render clustered markers.
  */
 async function renderMap() {
   if (!_map) return;
@@ -173,15 +169,10 @@ async function renderMap() {
   const persons = data ? (data.persons || []) : [];
 
   // Clear existing content
-  _markerLayer.clearLayers();
-  if (_heatLayer) {
-    _map.removeLayer(_heatLayer);
-    _heatLayer = null;
-  }
+  _clusterLayer.clearLayers();
 
   const statusEl = document.getElementById('map-status');
   statusEl.textContent = 'Loading locations…';
-  document.getElementById('map-mode-btn').disabled = true;
 
   // Build list of birth-place entries that need geocoding
   const rawEntries = [];
@@ -244,8 +235,6 @@ async function renderMap() {
   // Keep only entries that resolved to coordinates
   const entries = rawEntries.filter(e => e.coords !== null);
 
-  document.getElementById('map-mode-btn').disabled = false;
-
   if (entries.length === 0) {
     statusEl.textContent = 'No location data found.';
     _mapRendering = false;
@@ -254,17 +243,7 @@ async function renderMap() {
 
   statusEl.textContent = `${entries.length} location${entries.length !== 1 ? 's' : ''}`;
 
-  // Auto-switch to heatmap if not yet manually set and threshold exceeded
-  if (!_mapModeManual && entries.length > HEAT_THRESHOLD) {
-    _mapMode = 'heat';
-    _updateMapModeButton();
-  }
-
-  if (_mapMode === 'heat') {
-    _renderHeatmap(entries);
-  } else {
-    _renderMarkers(entries);
-  }
+  _renderMarkers(entries);
 
   // Fit bounds
   const latlngs = entries.map(e => [e.coords.lat, e.coords.lon]);
@@ -303,39 +282,6 @@ function _renderMarkers(entries) {
         });
       }
     });
-    _markerLayer.addLayer(marker);
+    _clusterLayer.addLayer(marker);
   }
-}
-
-function _renderHeatmap(entries) {
-  const points = entries.map(({ coords }) => [coords.lat, coords.lon, 1.0]);
-  _heatLayer = L.heatLayer(points, {
-    radius:   30,
-    blur:     20,
-    maxZoom:  12,
-    gradient: { 0.3: '#57b8ff', 0.6: '#4caf50', 1.0: '#e94560' }
-  }).addTo(_map);
-}
-
-/* -------------------------------------------------------
-   Mode toggle
-------------------------------------------------------- */
-function _updateMapModeButton() {
-  const btn = document.getElementById('map-mode-btn');
-  if (!btn) return;
-  if (_mapMode === 'markers') {
-    btn.textContent = '🌡 Heatmap';
-    btn.title = 'Switch to heatmap view';
-  } else {
-    btn.textContent = '📍 Markers';
-    btn.title = 'Switch to marker view';
-  }
-}
-
-function toggleMapMode() {
-  if (_mapRendering) return;
-  _mapModeManual = true;
-  _mapMode = _mapMode === 'markers' ? 'heat' : 'markers';
-  _updateMapModeButton();
-  renderMap();
 }
