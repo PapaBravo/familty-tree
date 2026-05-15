@@ -63,11 +63,19 @@ copyDir(
   path.join(vendorDir, 'images')
 );
 
-// leaflet.heat (ships a single JS file)
-const leafletHeatDir = path.join(nm, 'leaflet.heat', 'dist');
-const leafletHeatSrc = fs.existsSync(path.join(leafletHeatDir, 'leaflet-heat.js'))
-  ? path.join(leafletHeatDir, 'leaflet-heat.js')
-  : path.join(nm, 'leaflet.heat', 'leaflet-heat.js');
-copy(leafletHeatSrc, path.join(vendorDir, 'leaflet-heat.js'));
+// leaflet.markercluster (JS bundle + two CSS files)
+const mcDist = path.join(nm, 'leaflet.markercluster', 'dist');
+copy(
+  path.join(mcDist, 'leaflet.markercluster.js'),
+  path.join(vendorDir, 'leaflet.markercluster.js')
+);
+copy(
+  path.join(mcDist, 'MarkerCluster.css'),
+  path.join(vendorDir, 'MarkerCluster.css')
+);
+copy(
+  path.join(mcDist, 'MarkerCluster.Default.css'),
+  path.join(vendorDir, 'MarkerCluster.Default.css')
+);
 
 console.log('Done.');
