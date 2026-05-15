@@ -183,10 +183,11 @@ async function renderMap() {
   statusEl.textContent = 'Loading locations…';
   document.getElementById('map-mode-btn').disabled = true;
 
-  // Build list of entries that need geocoding
+  // Build list of birth-place entries that need geocoding
   const rawEntries = [];
   for (const person of persons) {
     for (const place of (person.places || [])) {
+      if (place.type !== 'birth') continue;
       if (place.coordinates && place.coordinates.lat != null && place.coordinates.lon != null) {
         rawEntries.push({
           person,

@@ -263,6 +263,18 @@ button { cursor: pointer; font: inherit; }
 .partnership-entry .partnership-date:focus { outline: none; border-color: var(--accent2); }
 .partnership-entry button { background: var(--accent); color: #fff; border: none; border-radius: var(--radius); padding: 5px 10px; }
 
+.place-entry {
+  display: flex; gap: 8px; align-items: flex-start; margin-bottom: 8px; flex-wrap: wrap;
+}
+.place-entry .place-type-select { flex: 1; min-width: 100px; }
+.place-entry .place-name-input {
+  flex: 2; min-width: 130px;
+  padding: 8px 12px; background: var(--bg); color: var(--text);
+  border: 1px solid var(--surface2); border-radius: var(--radius); font: inherit;
+}
+.place-entry .place-name-input:focus { outline: none; border-color: var(--accent2); }
+.place-entry button { background: var(--accent); color: #fff; border: none; border-radius: var(--radius); padding: 5px 10px; }
+
 /* ---------- Person Detail Modal ------------------------- */
 .detail-header { display: flex; gap: 20px; align-items: flex-start; margin-bottom: 20px; }
 .detail-avatar {
