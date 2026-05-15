@@ -566,7 +566,7 @@ function collectPlacesFromEditor() {
   return places;
 }
 
-
+function savePersonFromModal() {
   const activeId = getActiveId();
   if (!activeId) return;
 
