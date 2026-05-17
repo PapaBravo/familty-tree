@@ -771,7 +771,6 @@ function parsePartialDate(dateStr) {
 
   if (month !== null && (month < 1 || month > 12)) return null;
   if (day !== null) {
-    if (month === null) return null;
     const candidate = new Date(Date.UTC(year, month - 1, day));
     if (
       candidate.getUTCFullYear() !== year ||
@@ -790,9 +789,13 @@ function normalizePartialDateInput(value) {
   if (!trimmed) return '';
   const parsed = parsePartialDate(trimmed);
   if (!parsed) return null;
-  // parsePartialDate() already enforces canonical YYYY, YYYY-MM, and YYYY-MM-DD
-  // shapes, so trimming whitespace is the only normalization needed.
-  return trimmed;
+  if (parsed.day !== null) {
+    return `${parsed.year}-${String(parsed.month).padStart(2, '0')}-${String(parsed.day).padStart(2, '0')}`;
+  }
+  if (parsed.month !== null) {
+    return `${parsed.year}-${String(parsed.month).padStart(2, '0')}`;
+  }
+  return String(parsed.year);
 }
 
 function getPartialDateYear(dateStr) {
