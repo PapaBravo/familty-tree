@@ -13,7 +13,7 @@
   --accent2:     #57b8ff;
   --text:        #e0e0e0;
   --text-muted:  #8892a4;
-  --living:      #4caf50;
+  --living:      #29b6f6;
   --deceased:    #e94560;
   --marriage:    #FFD700;
   --divorced:    #ff9800;
@@ -344,7 +344,7 @@ button { cursor: pointer; font: inherit; }
 /* Person marker circle */
 .map-marker-circle {
   width: 44px; height: 44px; border-radius: 50%;
-  border: 3px solid #4caf50;
+  border: 3px solid #29b6f6;
   background: var(--surface2);
   display: flex; align-items: center; justify-content: center;
   overflow: hidden;
@@ -370,6 +370,29 @@ button { cursor: pointer; font: inherit; }
 .map-popup-type { font-size: .78rem; color: #888; margin-bottom: 2px; }
 .map-popup-place { font-style: italic; margin-bottom: 4px; }
 .map-popup-desc { font-size: .82rem; color: #666; margin-top: 4px; }
+
+/* Override Leaflet.markercluster cluster icon colors for better visibility */
+.marker-cluster-small {
+  background-color: rgba(41, 182, 246, 0.4);
+}
+.marker-cluster-small div {
+  background-color: rgba(41, 182, 246, 0.8);
+  color: #fff;
+}
+.marker-cluster-medium {
+  background-color: rgba(255, 152, 0, 0.4);
+}
+.marker-cluster-medium div {
+  background-color: rgba(255, 152, 0, 0.8);
+  color: #fff;
+}
+.marker-cluster-large {
+  background-color: rgba(233, 69, 96, 0.4);
+}
+.marker-cluster-large div {
+  background-color: rgba(233, 69, 96, 0.8);
+  color: #fff;
+}
 
 /* Override Leaflet popup styles to match dark theme */
 .leaflet-popup-content-wrapper {
