@@ -1,11 +1,11 @@
 window.treeGraph = (() => {
   const NODE_R = 36;
-  const H_SEP = 140;
+  const H_SEP = 80;
   const V_SEP = 160;
   const PARTNER_ROW_PROXIMITY = 12;
   const MIN_PARTNER_DISTANCE_FACTOR = 0.8;
   const MAX_PARTNER_PLACEMENT_STEPS = 6;
-  const ANCESTOR_MIN_GAP_FACTOR = 0.95;
+  const ANCESTOR_MIN_GAP_FACTOR = 1;
   const ANCESTOR_OPTIMIZATION_ITERATIONS = 60;
   const ANCESTOR_FINAL_ALIGNMENT_PASSES = 3;
   const PARENT_MIDPOINT_PULL = 0.55;
