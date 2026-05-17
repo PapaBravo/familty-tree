@@ -236,6 +236,7 @@ function openEditModal(personId) {
 
   document.getElementById('edit-modal-title').textContent = person ? 'Edit Person' : 'New Person';
   document.getElementById('edit-name').value = person ? person.name : '';
+  document.getElementById('edit-full-name').value = person ? (person.fullName || '') : '';
   document.getElementById('edit-birth').value = person ? (person.birthDate || '') : '';
   document.getElementById('edit-death').value = person ? (person.deathDate || '') : '';
   document.getElementById('edit-description').value = person ? (person.description || '') : '';
@@ -577,6 +578,7 @@ function savePersonFromModal() {
     showToast('Name is required', 'error');
     return;
   }
+  const fullName = document.getElementById('edit-full-name').value.trim();
 
   const birthDateInput = document.getElementById('edit-birth').value.trim();
   const birthDate = normalizePartialDateInput(birthDateInput);
@@ -612,6 +614,7 @@ function savePersonFromModal() {
 
   const personData = {
     name,
+    fullName,
     birthDate: birthDate || '',
     deathDate: deathDate || '',
     description: document.getElementById('edit-description').value.trim(),
@@ -620,11 +623,14 @@ function savePersonFromModal() {
     places:      _mergePlacesWithCoordinates(collectPlacesFromEditor(),
                    _editingPersonId ? (data.persons.find(p => p.id === _editingPersonId) || {}).places : [])
   };
+  if (!fullName) delete personData.fullName;
 
   if (_editingPersonId) {
     const idx = data.persons.findIndex(p => p.id === _editingPersonId);
     if (idx !== -1) {
-      data.persons[idx] = { ...data.persons[idx], ...personData };
+      const updatedPerson = { ...data.persons[idx], ...personData };
+      if (!fullName) delete updatedPerson.fullName;
+      data.persons[idx] = updatedPerson;
     }
   } else {
     data.persons.push({ id: personId, ...personData });
