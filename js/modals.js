@@ -236,6 +236,7 @@ function openEditModal(personId) {
 
   document.getElementById('edit-modal-title').textContent = person ? 'Edit Person' : 'New Person';
   document.getElementById('edit-name').value = person ? person.name : '';
+  document.getElementById('edit-full-name').value = person ? (person.fullName || '') : '';
   document.getElementById('edit-birth').value = person ? (person.birthDate || '') : '';
   document.getElementById('edit-death').value = person ? (person.deathDate || '') : '';
   document.getElementById('edit-description').value = person ? (person.description || '') : '';
@@ -577,6 +578,7 @@ function savePersonFromModal() {
     showToast('Name is required', 'error');
     return;
   }
+  const fullName = document.getElementById('edit-full-name').value.trim();
 
   const birthDateInput = document.getElementById('edit-birth').value.trim();
   const birthDate = normalizePartialDateInput(birthDateInput);
@@ -612,6 +614,7 @@ function savePersonFromModal() {
 
   const personData = {
     name,
+    fullName: fullName || undefined,
     birthDate: birthDate || '',
     deathDate: deathDate || '',
     description: document.getElementById('edit-description').value.trim(),

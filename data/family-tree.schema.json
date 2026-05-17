@@ -22,6 +22,7 @@
           {
             "id": "p1",
             "name": "George Harrison Sr.",
+            "fullName": "George Harrison Sr.",
             "description": "Patriarch of the Harrison family.",
             "birthDate": "1920-03-15",
             "deathDate": "1998-11-02",
@@ -65,8 +66,14 @@
         "name": {
           "type": "string",
           "minLength": 1,
-          "description": "Full display name of the person. May include maiden names in parentheses.",
+          "description": "Display label used for this person throughout the app's renderings.",
           "examples": ["George Harrison Sr.", "Susan Harrison (née Clark)"]
+        },
+        "fullName": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Legal full name of the person.",
+          "examples": ["George Harrison Sr.", "Susan Margaret Clark"]
         },
         "birthDate": {
           "type": "string",
