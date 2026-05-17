@@ -115,7 +115,7 @@ function _buildMarkerIcon(person) {
   const cachedUrl = _imageCache.get(person.id);
   const safeImgSrc = cachedUrl || sanitizeImageUrl(person.image);
   const living = !isAssumedDeceased(person);
-  const borderColor = living ? '#4caf50' : '#e94560';
+  const borderColor = living ? '#29b6f6' : '#e94560';
 
   let inner;
   if (safeImgSrc) {
