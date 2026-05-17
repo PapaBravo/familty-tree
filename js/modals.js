@@ -578,6 +578,18 @@ function savePersonFromModal() {
     return;
   }
 
+  const birthDate = normalizePartialDateInput(document.getElementById('edit-birth').value);
+  if (birthDate === null) {
+    showToast('Birth date must use YYYY, YYYY-MM, or YYYY-MM-DD', 'error');
+    return;
+  }
+
+  const deathDate = normalizePartialDateInput(document.getElementById('edit-death').value);
+  if (deathDate === null) {
+    showToast('Death date must use YYYY, YYYY-MM, or YYYY-MM-DD', 'error');
+    return;
+  }
+
   // Determine the person ID (existing or new)
   const personId = _editingPersonId || generateId();
 
@@ -598,8 +610,8 @@ function savePersonFromModal() {
 
   const personData = {
     name,
-    birthDate: document.getElementById('edit-birth').value || '',
-    deathDate: document.getElementById('edit-death').value || '',
+    birthDate,
+    deathDate,
     description: document.getElementById('edit-description').value.trim(),
     image:       imageValue,
     parents:     collectParentsFromEditor(),
@@ -707,7 +719,7 @@ const _currentYear = new Date().getFullYear();
 /** Returns true when a person's own birth date implies they are over 110. */
 function _isAssumedDeceasedByBirthDate(person) {
   if (!person || !person.birthDate) return false;
-  const birthYear = new Date(person.birthDate + 'T00:00:00').getFullYear();
+  const birthYear = getPartialDateYear(person.birthDate);
   return !isNaN(birthYear) && (_currentYear - birthYear) > 110;
 }
 
@@ -727,7 +739,7 @@ function isAssumedDeceased(person) {
     const hasOldChild = persons.some(p => {
       if (!(p.parents || []).some(pr => pr.personId === person.id)) return false;
       if (!p.birthDate) return false;
-      const by = new Date(p.birthDate + 'T00:00:00').getFullYear();
+      const by = getPartialDateYear(p.birthDate);
       return !isNaN(by) && (_currentYear - by) >= 90;
     });
     if (hasOldChild) return true;
@@ -746,11 +758,60 @@ function isAssumedDeceased(person) {
   return false;
 }
 
+function parsePartialDate(dateStr) {
+  if (!dateStr || typeof dateStr !== 'string') return null;
+  const match = dateStr.trim().match(/^(\d{4})(?:-(\d{1,2})(?:-(\d{1,2}))?)?$/);
+  if (!match) return null;
+
+  const year = Number(match[1]);
+  const month = match[2] ? Number(match[2]) : null;
+  const day = match[3] ? Number(match[3]) : null;
+
+  if (month !== null && (month < 1 || month > 12)) return null;
+  if (day !== null) {
+    if (month === null) return null;
+    const candidate = new Date(Date.UTC(year, month - 1, day));
+    if (
+      candidate.getUTCFullYear() !== year ||
+      candidate.getUTCMonth() !== month - 1 ||
+      candidate.getUTCDate() !== day
+    ) {
+      return null;
+    }
+  }
+
+  return { year, month, day };
+}
+
+function normalizePartialDateInput(value) {
+  const trimmed = (value || '').trim();
+  if (!trimmed) return '';
+  const parsed = parsePartialDate(trimmed);
+  if (!parsed) return null;
+
+  const normalized = [String(parsed.year).padStart(4, '0')];
+  if (parsed.month !== null) normalized.push(String(parsed.month).padStart(2, '0'));
+  if (parsed.day !== null) normalized.push(String(parsed.day).padStart(2, '0'));
+  return normalized.join('-');
+}
+
+function getPartialDateYear(dateStr) {
+  const parsed = parsePartialDate(dateStr);
+  return parsed ? parsed.year : NaN;
+}
+
 function formatDate(dateStr) {
   if (!dateStr) return '';
-  const d = new Date(dateStr + 'T00:00:00');
-  if (isNaN(d)) return dateStr;
-  return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+  const parsed = parsePartialDate(dateStr);
+  if (!parsed) return dateStr;
+  if (parsed.month === null) return String(parsed.year);
+
+  const d = new Date(Date.UTC(parsed.year, parsed.month - 1, parsed.day || 1));
+  if (parsed.day === null) {
+    return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', timeZone: 'UTC' });
+  }
+
+  return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' });
 }
 
 /**
