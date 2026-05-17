@@ -612,8 +612,8 @@ function savePersonFromModal() {
 
   const personData = {
     name,
-    birthDate,
-    deathDate,
+    birthDate: birthDate || '',
+    deathDate: deathDate || '',
     description: document.getElementById('edit-description').value.trim(),
     image:       imageValue,
     parents:     collectParentsFromEditor(),
@@ -790,6 +790,8 @@ function normalizePartialDateInput(value) {
   if (!trimmed) return '';
   const parsed = parsePartialDate(trimmed);
   if (!parsed) return null;
+  // parsePartialDate() already enforces canonical YYYY, YYYY-MM, and YYYY-MM-DD
+  // shapes, so trimming whitespace is the only normalization needed.
   return trimmed;
 }
 
@@ -798,6 +800,8 @@ function getPartialDateYear(dateStr) {
   return parsed ? parsed.year : NaN;
 }
 
+// Any modern leap year works here because we only need a stable Date instance
+// to ask the browser for a localized month name when formatting YYYY-MM values.
 const MONTH_NAME_REFERENCE_YEAR = 2000;
 
 function formatDate(dateStr) {
