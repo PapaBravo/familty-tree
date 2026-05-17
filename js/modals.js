@@ -788,11 +788,7 @@ function normalizePartialDateInput(value) {
   if (!trimmed) return '';
   const parsed = parsePartialDate(trimmed);
   if (!parsed) return null;
-
-  const normalized = [String(parsed.year).padStart(4, '0')];
-  if (parsed.month !== null) normalized.push(String(parsed.month).padStart(2, '0'));
-  if (parsed.day !== null) normalized.push(String(parsed.day).padStart(2, '0'));
-  return normalized.join('-');
+  return trimmed;
 }
 
 function getPartialDateYear(dateStr) {
@@ -806,11 +802,13 @@ function formatDate(dateStr) {
   if (!parsed) return dateStr;
   if (parsed.month === null) return String(parsed.year);
 
-  const d = new Date(Date.UTC(parsed.year, parsed.month - 1, parsed.day || 1));
   if (parsed.day === null) {
-    return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', timeZone: 'UTC' });
+    const monthName = new Date(Date.UTC(2000, parsed.month - 1, 1))
+      .toLocaleDateString(undefined, { month: 'short', timeZone: 'UTC' });
+    return `${monthName} ${parsed.year}`;
   }
 
+  const d = new Date(Date.UTC(parsed.year, parsed.month - 1, parsed.day));
   return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' });
 }
 
