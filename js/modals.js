@@ -760,7 +760,7 @@ function isAssumedDeceased(person) {
 
 function parsePartialDate(dateStr) {
   if (!dateStr || typeof dateStr !== 'string') return null;
-  const match = dateStr.trim().match(/^(\d{4})(?:-(\d{1,2})(?:-(\d{1,2}))?)?$/);
+  const match = dateStr.trim().match(/^(\d{4})(?:-(\d{2})(?:-(\d{2}))?)?$/);
   if (!match) return null;
 
   const year = Number(match[1]);
