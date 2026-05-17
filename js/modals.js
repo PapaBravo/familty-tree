@@ -578,14 +578,16 @@ function savePersonFromModal() {
     return;
   }
 
-  const birthDate = normalizePartialDateInput(document.getElementById('edit-birth').value);
-  if (birthDate === null) {
+  const birthDateInput = document.getElementById('edit-birth').value.trim();
+  const birthDate = normalizePartialDateInput(birthDateInput);
+  if (birthDateInput && birthDate === null) {
     showToast('Birth date must use YYYY, YYYY-MM, or YYYY-MM-DD', 'error');
     return;
   }
 
-  const deathDate = normalizePartialDateInput(document.getElementById('edit-death').value);
-  if (deathDate === null) {
+  const deathDateInput = document.getElementById('edit-death').value.trim();
+  const deathDate = normalizePartialDateInput(deathDateInput);
+  if (deathDateInput && deathDate === null) {
     showToast('Death date must use YYYY, YYYY-MM, or YYYY-MM-DD', 'error');
     return;
   }
@@ -796,6 +798,8 @@ function getPartialDateYear(dateStr) {
   return parsed ? parsed.year : NaN;
 }
 
+const MONTH_NAME_REFERENCE_YEAR = 2000;
+
 function formatDate(dateStr) {
   if (!dateStr) return '';
   const parsed = parsePartialDate(dateStr);
@@ -803,7 +807,7 @@ function formatDate(dateStr) {
   if (parsed.month === null) return String(parsed.year);
 
   if (parsed.day === null) {
-    const monthName = new Date(Date.UTC(2000, parsed.month - 1, 1))
+    const monthName = new Date(Date.UTC(MONTH_NAME_REFERENCE_YEAR, parsed.month - 1, 1))
       .toLocaleDateString(undefined, { month: 'short', timeZone: 'UTC' });
     return `${monthName} ${parsed.year}`;
   }
