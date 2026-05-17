@@ -614,7 +614,7 @@ function savePersonFromModal() {
 
   const personData = {
     name,
-    fullName: fullName || undefined,
+    fullName,
     birthDate: birthDate || '',
     deathDate: deathDate || '',
     description: document.getElementById('edit-description').value.trim(),

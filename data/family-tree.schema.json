@@ -71,7 +71,6 @@
         },
         "fullName": {
           "type": "string",
-          "minLength": 1,
           "description": "Legal full name of the person as it appears on official records, while `name` is the shorter display label used throughout the app.",
           "examples": ["George William Harrison Sr.", "Susan Margaret Clark"]
         },
