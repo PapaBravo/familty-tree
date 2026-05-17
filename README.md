@@ -1,30 +1,52 @@
 # Family Tree
 
-A privacy-first static website for visualizing and managing family trees.
-All data is stored in your browser's localStorage — no server, no account required.
+A browser-first static website for managing and visualizing family trees.
+Core family data stays in the browser, with optional map features that call OpenStreetMap services when you open the map view or geocode missing coordinates.
 
 ## Features
 
-- **List view** with full-text search
-- **Tree view** rendered with D3 — select any root person, depth, and mode (descendants, inverted ancestors, or full family)
-- **Multiple families** — create, import, export, and delete family datasets
-- **Person editing** — add/edit names, dates, descriptions, photos, and parent relations
-- **JSON import/export** for data portability
-- **Sample family** preloaded with adoption, divorce, and remarriage edge cases
+- **Multiple families** — create, import, export, and delete separate datasets
+- **List view** with full-text search across names and descriptions
+- **Tree view** rendered with D3 in three modes: descendants, inverted ancestors, and force layout
+- **Map view** for places attached to people, with clustering and cached geocoding
+- **Person editing** for names, dates, notes, photos, parents, partnerships, and places
+- **JSON and ZIP import/export** for portable backups, including uploaded photos
+- **Local photo storage** in IndexedDB
+- **Sample family** preloaded on first run
 
-## Deployment
+## Privacy and network behavior
 
-This site can be deployed directly to GitHub Pages (Settings → Pages → source: `main` / root).
-No build step required.
+- Family data, selected family state, and geocode cache are stored in `localStorage`
+- Uploaded photos are stored in `IndexedDB`
+- The sample dataset is fetched from `data/sample-family.json` on first run
+- The map view loads OpenStreetMap tiles and geocodes place names through Nominatim when coordinates are missing
 
 ## Local development
 
 ```bash
+npm ci
+npm run build
 npx serve .
 # or
 python3 -m http.server 8080
 ```
 
+`npm run build` vendors browser dependencies into `js/vendor/`.
+
+## Deployment
+
+The repository includes a GitHub Pages workflow that runs:
+
+```bash
+npm ci
+npm run build
+```
+
+before publishing the site.
+
+If you deploy manually, run the same commands first and publish the repository root.
+
 ## Documentation
 
-See [docs/architecture.adoc](docs/architecture.adoc) for the full architecture documentation.
+- Architecture: [docs/architecture.adoc](docs/architecture.adoc)
+- Export schema: [data/family-tree.schema.json](data/family-tree.schema.json)
