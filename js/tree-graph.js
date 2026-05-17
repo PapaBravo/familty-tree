@@ -586,7 +586,7 @@ window.treeGraph = (() => {
           source: parentRef.personId,
           target: child.id,
           linkClass: parentRef.type === 'adopted' ? 'adopted' : 'parent-child',
-          strength: 0.3
+          strength: 0.6
         });
       });
     });
