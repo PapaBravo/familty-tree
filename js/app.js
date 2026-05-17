@@ -161,6 +161,9 @@ function bindEvents() {
   document.getElementById('add-person-btn').addEventListener('click', () => {
     openEditModal(null);
   });
+  document.getElementById('add-person-list-btn').addEventListener('click', () => {
+    openEditModal(null);
+  });
 
   // Tree render button
   document.getElementById('render-btn').addEventListener('click', renderTree);
@@ -184,6 +187,7 @@ function bindEvents() {
     deletePersonFromModal();
   });
   document.getElementById('edit-cancel-btn').addEventListener('click', () => closeModal('edit-modal'));
+  document.getElementById('edit-close-btn').addEventListener('click', () => closeModal('edit-modal'));
   document.getElementById('detail-close-btn').addEventListener('click', () => {
     _clearDetailAvatarObjectUrl();
     closeModal('person-detail-modal');
@@ -222,6 +226,7 @@ function bindEvents() {
   document.getElementById('import-file-input').addEventListener('change', handleImportFile);
   document.getElementById('import-confirm-btn').addEventListener('click', doImport);
   document.getElementById('import-cancel-btn').addEventListener('click', () => closeModal('import-modal'));
+  document.getElementById('import-close-btn').addEventListener('click', () => closeModal('import-modal'));
 }
 
 /* -------------------------------------------------------

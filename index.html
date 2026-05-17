@@ -44,7 +44,7 @@
     <div id="list-panel" class="panel active">
       <div id="list-controls">
         <input id="search-input" type="search" placeholder="Search by name or description…" autocomplete="off" />
-        <button id="add-person-list-btn" class="nav-btn primary" onclick="openEditModal(null)">＋ Add Person</button>
+        <button id="add-person-list-btn" class="nav-btn primary">＋ Add Person</button>
         <span id="person-count"></span>
       </div>
       <div id="person-list"></div>
@@ -59,7 +59,6 @@
         <select id="tree-mode-select" title="Select tree rendering mode">
           <option value="descendants">Descendants</option>
           <option value="ancestors">Ancestors (inverted)</option>
-          <option value="full-family">Full Family</option>
           <option value="force">Force</option>
         </select>
         <label for="depth-input">Depth:</label>
@@ -164,7 +163,7 @@
   <div class="modal wide">
     <div class="modal-header">
       <h2 id="edit-modal-title">Edit Person</h2>
-      <button class="modal-close" onclick="closeModal('edit-modal')">✕</button>
+      <button class="modal-close" id="edit-close-btn">✕</button>
     </div>
     <div class="modal-body">
       <div class="form-group">
@@ -245,7 +244,7 @@
   <div class="modal wide">
     <div class="modal-header">
       <h2>Import Family Data</h2>
-      <button class="modal-close" onclick="closeModal('import-modal')">✕</button>
+      <button class="modal-close" id="import-close-btn">✕</button>
     </div>
     <div class="modal-body">
       <p style="margin-bottom:12px;color:var(--text-muted)">Load a <strong>.zip</strong> (with photos) or a plain <strong>.json</strong> file, or paste JSON below. This creates a new family entry.</p>
@@ -273,8 +272,10 @@
 <script src="js/images.js"></script>
 <script src="js/storage.js"></script>
 <script src="js/modals.js"></script>
-<script src="js/list.js"></script>
-<script src="js/tree.js"></script>
+  <script src="js/list.js"></script>
+  <script src="js/tree-graph.js"></script>
+  <script src="js/tree-renderer.js"></script>
+  <script src="js/tree.js"></script>
 <script src="js/map.js"></script>
 <script src="js/app.js"></script>
 </body>

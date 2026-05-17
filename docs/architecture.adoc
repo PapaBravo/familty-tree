@@ -8,283 +8,274 @@
 
 == Overview
 
-Family Tree is a privacy-first, browser-only web application for visualizing and managing family genealogy data.
-All data is stored exclusively in the user's browser via the Web Storage API (localStorage).
-No server, no account, no network requests after initial page load.
+Family Tree is a static web application for managing genealogy data in the browser.
+It is built with plain HTML, CSS, and JavaScript, and is deployed as static files.
 
-The application is a static site deployable to GitHub Pages, requiring no build step.
+Most application data stays local to the browser:
+
+* family data and UI state live in `localStorage`
+* uploaded images live in `IndexedDB`
+* geocoding results are cached in `localStorage`
+
+The application is not fully offline-only.
+The sample dataset is fetched on first load, and the map feature uses OpenStreetMap tiles plus Nominatim geocoding when a place does not already have stored coordinates.
 
 == Goals and Constraints
 
-* **Privacy**: All data stays in the browser. No external API calls for data.
-* **Data ownership**: Full JSON export/import for portability.
-* **Static deployment**: Pure HTML, CSS, and vanilla JavaScript. No server-side rendering.
-* **No frameworks**: Vanilla JS (ES6+). D3.js is the only external library, used for tree visualisation.
-* **Multiple families**: The user can manage several independent family datasets.
+* **Readable code**: keep files small and responsibilities clear
+* **Static deployment**: no backend, no server-side rendering
+* **Portable data**: JSON and ZIP import/export
+* **Browser storage first**: family records remain local unless the user exports them
+* **Framework-free UI**: plain DOM APIs and a few vendored libraries
 
-== High-Level Architecture
-
-[plantuml, architecture-overview, svg]
-....
-@startuml
-actor User
-
-package "Browser" {
-  [index.html] --> [app.js]
-  [app.js] --> [storage.js]
-  [app.js] --> [list.js]
-  [app.js] --> [tree.js]
-  [app.js] --> [modals.js]
-
-  database "localStorage" as LS
-  [storage.js] --> LS
-}
-
-[app.js] ..> [data/sample-family.json] : fetch on first load
-@enduml
-....
-
-On first load the application fetches `data/sample-family.json` via `fetch()` and stores it in localStorage.
-Subsequent loads read exclusively from localStorage.
-
-== File Structure
+== High-Level Structure
 
 [source]
 ----
-/
-├── index.html               # Entry point, all markup and modal templates
-├── css/
-│   └── style.css            # Single stylesheet (dark theme, responsive)
-├── js/
-│   ├── storage.js           # localStorage CRUD helpers
-│   ├── modals.js            # Modal open/close, person detail & edit logic
-│   ├── list.js              # List view rendering with full-text search
-│   ├── tree.js              # D3 v7 tree rendering
-│   └── app.js               # Bootstrap, family selector, import/export
-├── data/
-│   └── sample-family.json   # Pre-loaded sample family with edge cases
-└── docs/
-    └── architecture.adoc    # This document
+index.html
+  -> js/app.js
+     -> js/storage.js
+     -> js/list.js
+     -> js/modals.js
+     -> js/tree.js
+        -> js/tree-graph.js
+        -> js/tree-renderer.js
+     -> js/map.js
+     -> js/images.js
 ----
+
+=== Responsibilities
+
+|===
+| File | Responsibility
+
+| `index.html`
+| Static shell, panels, controls, and modal markup
+
+| `js/app.js`
+| Bootstrap, family switching, import/export, tab events, toast messages
+
+| `js/storage.js`
+| `localStorage` persistence for families and family datasets
+
+| `js/images.js`
+| `IndexedDB` storage for uploaded photos
+
+| `js/list.js`
+| Searchable list rendering
+
+| `js/modals.js`
+| Modal open/close behavior, detail view, person editing, shared formatting helpers
+
+| `js/tree.js`
+| Tree controller: reads UI state and triggers rendering
+
+| `js/tree-graph.js`
+| Tree graph selection and layout building for descendants, ancestors, and force mode
+
+| `js/tree-renderer.js`
+| D3 rendering, zooming, node drawing, and force simulation lifecycle
+
+| `js/map.js`
+| Leaflet map setup, marker rendering, geocoding, and popup behavior
+|===
+
+== Build and Dependencies
+
+The repository vendors browser dependencies into `js/vendor/` during the build step.
+This keeps deployment simple while avoiding runtime CDN dependencies.
+
+=== Build command
+
+[source,bash]
+----
+npm ci
+npm run build
+----
+
+=== Vendored libraries
+
+* `d3`
+* `jszip`
+* `leaflet`
+* `leaflet.markercluster`
+
+`build.js` copies the required files from `node_modules` into `js/vendor/`.
 
 == Data Model
 
-=== Family Registry
+=== Family registry
 
-Two localStorage keys manage the family catalogue:
+Two `localStorage` keys manage the available datasets:
 
 |===
-| Key | Value | Purpose
+| Key | Purpose
 
 | `familyTree_families`
-| `[{"id":"…","name":"…"}, …]`
-| Master list of all families
+| List of `{id, name}` family entries
 
 | `familyTree_active`
-| `"<family-id>"`
-| Currently selected family
-
-| `familyTree_data_{id}`
-| `{persons:[…], partnerships:[…]}`
-| Full data for a specific family
+| Currently selected family id
 |===
 
-=== Person Object
+Each family dataset is stored under `familyTree_data_{id}`.
+
+=== Family dataset
 
 [source,json]
 ----
 {
-  "id":          "uuid-v4-string",
-  "name":        "Full Name",
-  "description": "Optional biography",
-  "birthDate":   "YYYY-MM-DD",
-  "deathDate":   "YYYY-MM-DD",    // optional
-  "image":       "https://… or data:image/…",  // optional
+  "persons": [...],
+  "partnerships": [...]
+}
+----
+
+=== Person
+
+[source,json]
+----
+{
+  "id": "uuid-or-string",
+  "name": "Full Name",
+  "birthDate": "YYYY-MM-DD",
+  "deathDate": "YYYY-MM-DD",
+  "description": "Optional notes",
+  "image": "Optional http(s) URL or data URI",
   "parents": [
-    { "personId": "uuid-of-parent", "type": "mother" },
-    { "personId": "uuid-of-parent", "type": "father" },
-    { "personId": "uuid-of-parent", "type": "adopted" }
+    { "personId": "p1", "type": "mother" },
+    { "personId": "p2", "type": "father" }
+  ],
+  "places": [
+    { "type": "birth", "name": "Hamburg, Germany" }
   ]
 }
 ----
 
-Parent types: `mother`, `father`, `adopted`.
-A person may have multiple parent references (e.g. biological mother + adoptive father).
-
-=== Partnership Object
+=== Partnership
 
 [source,json]
 ----
 {
-  "id":        "uuid-v4-string",
-  "person1Id": "uuid",
-  "person2Id": "uuid",
-  "type":      "marriage | divorced | partner",
-  "startDate": "YYYY-MM-DD",   // optional
-  "endDate":   "YYYY-MM-DD"    // optional – for divorces / death of spouse
+  "id": "uuid-or-string",
+  "person1Id": "p1",
+  "person2Id": "p2",
+  "type": "marriage | divorced | partner",
+  "startDate": "YYYY-MM-DD",
+  "endDate": "YYYY-MM-DD"
 }
 ----
 
-=== Sample Family Edge Cases
+The canonical export shape is described in `data/family-tree.schema.json`.
 
-The bundled `data/sample-family.json` demonstrates:
+== Tree Rendering
 
-* Regular marriage (pp1)
-* First marriage ending in death of spouse (pp2 → pp3: remarriage)
-* Second marriage ending in natural death, followed by third marriage (pp4 → pp5)
-* Divorced partnership still alive (pp7 → pp8: new partner)
-* Adopted child (persons p8)
-* Unmarried partner (pp8, pp9)
-* Four generations of descendants
+Tree rendering is split into two layers.
 
-== Component Breakdown
+=== Controller layer (`js/tree.js`)
 
-=== storage.js
+The controller:
 
-Pure utility module, no DOM access.
+* reads the selected mode, root person, and depth
+* validates that the current family can be rendered
+* requests a render graph from `js/tree-graph.js`
+* passes the result to `js/tree-renderer.js`
 
-* `getFamilies()` / `saveFamilies()` – manage the family index.
-* `getFamilyData(id)` / `saveFamilyData(id, data)` – per-family data access.
-* `createFamily(name, data)` – generates a UUID, registers the family, stores data.
-* `deleteFamily(id)` – removes both the index entry and data key.
-* `generateId()` – uses `crypto.randomUUID()` with a Math.random fallback.
+=== Graph layer (`js/tree-graph.js`)
 
-=== modals.js
+This layer decides which people and relationships belong in the current view and computes positions where needed.
 
-Manages five modal dialogs:
+Supported modes:
 
-|===
-| Modal ID | Purpose
+* **Descendants**: build a D3 hierarchy rooted at the selected person and include current partners
+* **Ancestors**: collect parents up to the selected depth, include nearby descendants for context, then build a layered layout
+* **Force**: build a relationship graph for D3 force simulation
 
-| `person-detail-modal`
-| Read-only view of a person with navigation links to relatives
+=== Renderer layer (`js/tree-renderer.js`)
 
-| `edit-modal`
-| Create or edit a person; dynamic parent row builder
+This layer owns:
 
-| `export-modal`
-| Shows pretty-printed JSON; copy and download actions
+* SVG initialization
+* zoom behavior
+* parent/child and partnership link drawing
+* node rendering, labels, and photo clip paths
+* force simulation setup and teardown
+* viewport fitting for non-force layouts
 
-| `import-modal`
-| Paste JSON or load from file; validates structure before import
+== Map Rendering
 
-|===
+The map is optional and external-service-backed.
 
-Key helpers:
+When the map tab is opened:
 
-* `sanitizeImageUrl(url)` – strips anything that is not `https:`, `http:`, or `data:image/` before inserting into the DOM, preventing XSS via crafted image URLs.
-* `formatDate(dateStr)` – locale-aware date formatting.
-* `getInitials(name)` – generates a 1-2 character avatar placeholder.
+. Leaflet initializes the map container once.
+. The app gathers `places` from the active family.
+. Stored coordinates are reused immediately.
+. Missing coordinates are geocoded through Nominatim.
+. Successful geocodes are cached and written back into family data.
+. Markers are clustered with `leaflet.markercluster`.
 
-=== list.js
+External requests made by the map feature:
 
-Renders a responsive card grid of all persons in the active family.
+* OpenStreetMap tile requests
+* Nominatim geocoding requests
 
-* Full-text search across `name` and `description` fields (case-insensitive).
-* Each card shows avatar (image or initials), name, dates, living/deceased badge, and adopted badge.
-* Clicking a card opens the `person-detail-modal`.
+== Import and Export
 
-=== tree.js
+=== Import
 
-D3 v7 hierarchical tree renderer.
+Imports support:
 
-==== Algorithm
+* raw JSON pasted into the modal
+* `.json` files
+* `.zip` files containing `family.json` and optional `images/`
 
-1. Read the selected root person, depth, and mode from the controls.
-2. For `descendants` mode, `collectDescendants()` walks the child graph up to `maxDepth`.
-3. For `ancestors` mode, `collectAncestors()` walks the parent graph up to `maxDepth`, includes children of those ancestors, and renders a generation-layered graph layout (not a strict tree) so siblings stay on the same row.
-4. For `full-family` mode, include all persons and partnerships, then build a strict generation-layered layout where each parent is exactly one row above every child.
-5. For `full-family` mode, run iterative horizontal optimization that prioritizes spouse proximity first, then parent/child midpoint alignment.
-6. For `descendants` mode, build a tree-compatible object graph where each node gets a `children` array.
-7. For `descendants` mode, deduplicate: prevent the same node appearing twice (handles DAGs).
-8. For `descendants` mode, pass the root to `d3.hierarchy()` then `d3.tree()` with `nodeSize`.
-9. Draw:
-   ** Parent-child links as `d3.linkVertical()` paths.
-   ** Partnership links as quadratic Bézier curves coloured by type.
-   ** Nodes as `<circle>` + optional `<image>` (with `<clipPath>`) + text labels.
-8. Fit the resulting bounding box to the viewport via `d3.zoomIdentity`.
+ZIP imports are unpacked in the browser with JSZip.
+Image blobs are stored in `IndexedDB` after the new family is created.
 
-==== Visual Design
+=== Export
 
-|===
-| Element | Style
+Exports support:
 
-| Living person node
-| Blue fill, green stroke
-
-| Deceased person node
-| Dark red fill, red stroke
-
-| Parent → child edge
-| Solid grey line
-
-| Adopted edge
-| Dashed cyan line
-
-| Marriage edge
-| Solid blue curve
-
-| Divorced edge
-| Dashed orange curve
-
-| Partner edge
-| Dotted purple curve
-|===
-
-Zoom and pan are enabled via `d3.zoom()`. The tree auto-fits on each render.
-
-=== app.js
-
-Top-level coordinator.
-
-* `boot()` – called on `DOMContentLoaded`. Loads sample family on first run, wires all events.
-* `refresh()` – re-renders list and, if the tree tab is active, the tree.
-* `bindEvents()` – attaches all UI event listeners (tabs, family selector, import/export, etc.).
-* `doImport()` – validates JSON structure and creates a new family from it.
-* `showToast(msg, type)` – small non-blocking notification system.
+* pretty-printed JSON
+* ZIP bundles containing `family.json` plus extracted image files
 
 == Storage Strategy
 
-Only `localStorage` is used.
-The maximum storage per origin is typically 5–10 MB.
-Base64-encoded images embedded as data URIs consume significant space; users should prefer hosted image URLs for large families.
+|===
+| Storage | Contents
 
-Key naming convention: `familyTree_` prefix avoids collisions with other apps sharing the same origin.
+| `localStorage`
+| family registry, active family id, family datasets, geocode cache
 
-== Security Considerations
+| `IndexedDB`
+| uploaded person photos
+|===
 
-* **XSS via image URLs**: User-supplied image URLs are sanitised in `sanitizeImageUrl()` before being set as `src` attributes. Only `https:`, `http:`, and `data:image/` prefixes are allowed.
-* **JSON import**: Parsed with `JSON.parse()` in a try/catch; no `eval`. Only the `persons` and `partnerships` arrays are consumed; arbitrary keys are ignored.
-* **No `innerHTML` with user data**: User-provided strings are always set via `.textContent` or created as `Text` nodes, not injected as HTML.
-* **CSP**: No inline event handlers in HTML (all wired via `addEventListener`).
+This split keeps structured family data simple while moving large binary files out of `localStorage`.
+
+== Security and Privacy Notes
+
+* User-provided image URLs are sanitized before use
+* Imported JSON is parsed with `JSON.parse()`
+* User text is inserted with DOM text APIs, not executed as HTML
+* Inline event handlers are avoided; UI events are wired in JavaScript
+* Map mode is the main exception to the app's local-first behavior because it talks to OpenStreetMap services
 
 == Deployment
 
-=== GitHub Pages
+The GitHub Actions Pages workflow:
 
-1. Push the repository to GitHub.
-2. In *Settings → Pages*, set the source to the `main` branch, root (`/`) folder.
-3. The site is live at `https://<org>.github.io/<repo>/`.
+. checks out the repository
+. installs dependencies with `npm ci`
+. runs `npm run build`
+. uploads the repository root as the Pages artifact
+. deploys with `actions/deploy-pages`
 
-No build step is required. D3 is loaded from the jsDelivr CDN with Subresource Integrity (SRI) verification.
+A manual deployment should follow the same build steps before publishing static files.
 
-=== Local Development
+== Future Improvement Directions
 
-[source,bash]
-----
-# Any static file server works, e.g.:
-npx serve .
-# or
-python3 -m http.server 8080
-----
-
-Opening `index.html` directly as a `file://` URL will cause the sample-data `fetch()` to fail in some browsers (CORS restriction on file:// origins).
-Using a local HTTP server avoids this.
-
-== Future Improvements
-
-* **Partnership management UI**: Add/edit partnerships from the application without manually importing JSON.
-* **Timeline view**: Chronological life event display.
-* **PWA / Service Worker**: Offline support and installability.
-* **IndexedDB backend**: Larger storage capacity for families with many images.
-* **Dark/light theme toggle**.
+* Add stronger import validation against the schema plus referential integrity checks
+* Reduce remaining global cross-file dependencies between UI modules
+* Move repeated DOM wiring patterns into smaller shared helpers
+* Add automated tests around import/export, storage, and tree graph generation
