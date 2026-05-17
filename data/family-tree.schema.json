@@ -70,15 +70,15 @@
         },
         "birthDate": {
           "type": "string",
-          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
-          "description": "Date of birth in ISO 8601 format (YYYY-MM-DD). Omit or use an empty string if unknown.",
-          "examples": ["1920-03-15", "1975-12-01"]
+          "pattern": "^\\d{4}(?:-\\d{2}(?:-\\d{2})?)?$",
+          "description": "Date of birth in partial ISO 8601 format (YYYY, YYYY-MM, or YYYY-MM-DD). Omit or use an empty string if unknown.",
+          "examples": ["1920", "1920-03", "1975-12-01"]
         },
         "deathDate": {
           "type": "string",
-          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
-          "description": "Date of death in ISO 8601 format (YYYY-MM-DD). Omit or use an empty string if the person is still living or the date is unknown.",
-          "examples": ["1998-11-02", "2001-05-18"]
+          "pattern": "^\\d{4}(?:-\\d{2}(?:-\\d{2})?)?$",
+          "description": "Date of death in partial ISO 8601 format (YYYY, YYYY-MM, or YYYY-MM-DD). Omit or use an empty string if the person is still living or the date is unknown.",
+          "examples": ["1998", "1998-11", "2001-05-18"]
         },
         "description": {
           "type": "string",
