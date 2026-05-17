@@ -614,7 +614,6 @@ function savePersonFromModal() {
 
   const personData = {
     name,
-    fullName,
     birthDate: birthDate || '',
     deathDate: deathDate || '',
     description: document.getElementById('edit-description').value.trim(),
@@ -623,11 +622,13 @@ function savePersonFromModal() {
     places:      _mergePlacesWithCoordinates(collectPlacesFromEditor(),
                    _editingPersonId ? (data.persons.find(p => p.id === _editingPersonId) || {}).places : [])
   };
+  if (fullName) personData.fullName = fullName;
 
   if (_editingPersonId) {
     const idx = data.persons.findIndex(p => p.id === _editingPersonId);
     if (idx !== -1) {
       data.persons[idx] = { ...data.persons[idx], ...personData };
+      if (!fullName) delete data.persons[idx].fullName;
     }
   } else {
     data.persons.push({ id: personId, ...personData });
