@@ -90,7 +90,9 @@ async function geocodePlace(name) {
 ------------------------------------------------------- */
 let _map = null;
 let _clusterLayer = null;
+let _autoSpiderfyLayers = [];
 let _mapRendering = false;
+const AUTO_SPIDERFY_MAX_PERSONS = 8;
 
 /* -------------------------------------------------------
    Initialisation
@@ -106,6 +108,19 @@ function initMap() {
   }).addTo(_map);
 
   _clusterLayer = L.markerClusterGroup().addTo(_map);
+}
+
+function _clearAutoSpiderfyLayers() {
+  _autoSpiderfyLayers.forEach(layer => {
+    if (_map && _map.hasLayer(layer)) _map.removeLayer(layer);
+  });
+  _autoSpiderfyLayers = [];
+}
+
+function _createAutoSpiderfyLayer() {
+  const layer = L.markerClusterGroup().addTo(_map);
+  _autoSpiderfyLayers.push(layer);
+  return layer;
 }
 
 /* -------------------------------------------------------
@@ -170,6 +185,7 @@ async function renderMap() {
 
   // Clear existing content
   _clusterLayer.clearLayers();
+  _clearAutoSpiderfyLayers();
 
   const statusEl = document.getElementById('map-status');
   statusEl.textContent = 'Loading locations…';
@@ -243,16 +259,76 @@ async function renderMap() {
 
   statusEl.textContent = `${entries.length} location${entries.length !== 1 ? 's' : ''}`;
 
-  _renderMarkers(entries);
+  const groupedEntries = _groupEntriesByCoordinate(entries);
+  const clusteredEntries = [];
+
+  groupedEntries.forEach(group => {
+    if (group.length > 1 && group.length <= AUTO_SPIDERFY_MAX_PERSONS) {
+      _renderMarkers(group, _createAutoSpiderfyLayer());
+      return;
+    }
+
+    clusteredEntries.push(...group);
+  });
+
+  _renderMarkers(clusteredEntries, _clusterLayer);
 
   // Fit bounds
   const latlngs = entries.map(e => [e.coords.lat, e.coords.lon]);
   _map.fitBounds(L.latLngBounds(latlngs), { padding: [40, 40], maxZoom: 10 });
+  _scheduleAutoSpiderfy();
 
   _mapRendering = false;
 }
 
-function _renderMarkers(entries) {
+function _groupEntriesByCoordinate(entries) {
+  const groups = new Map();
+
+  entries.forEach(entry => {
+    const key = `${entry.coords.lat},${entry.coords.lon}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(entry);
+  });
+
+  return Array.from(groups.values());
+}
+
+function _scheduleAutoSpiderfy() {
+  if (_autoSpiderfyLayers.length === 0) return;
+
+  const waitForMap = () => {
+    const layerAnimating = [_clusterLayer, ..._autoSpiderfyLayers]
+      .some(layer => layer && layer._inZoomAnimation);
+    if ((_map && _map._animatingZoom) || layerAnimating) {
+      window.requestAnimationFrame(waitForMap);
+      return;
+    }
+
+    _autoSpiderfyLayers.forEach(_spiderfyLayerCluster);
+  };
+
+  window.requestAnimationFrame(waitForMap);
+}
+
+function _spiderfyLayerCluster(layer) {
+  if (!layer || !layer._featureGroup) return;
+
+  let visibleCluster = null;
+  layer._featureGroup.eachLayer(featureLayer => {
+    if (visibleCluster) return;
+    if (!(featureLayer instanceof L.MarkerCluster)) return;
+    if (!featureLayer._icon) return;
+
+    const childCount = featureLayer.getChildCount();
+    if (childCount > 1 && childCount <= AUTO_SPIDERFY_MAX_PERSONS) {
+      visibleCluster = featureLayer;
+    }
+  });
+
+  if (visibleCluster) visibleCluster.spiderfy();
+}
+
+function _renderMarkers(entries, targetLayer) {
   for (const { person, place, coords } of entries) {
     const icon = _buildMarkerIcon(person);
     const marker = L.marker([coords.lat, coords.lon], { icon, title: person.name });
@@ -282,6 +358,6 @@ function _renderMarkers(entries) {
         });
       }
     });
-    _clusterLayer.addLayer(marker);
+    targetLayer.addLayer(marker);
   }
 }

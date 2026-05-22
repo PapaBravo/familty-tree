@@ -213,6 +213,7 @@ When the map tab is opened:
 . Missing coordinates are geocoded through Nominatim.
 . Successful geocodes are cached and written back into family data.
 . Markers are clustered with `leaflet.markercluster`.
+. Co-located clusters with fewer than 9 people are auto-expanded after the map settles.
 
 External requests made by the map feature:
 
