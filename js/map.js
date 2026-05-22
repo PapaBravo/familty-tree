@@ -93,6 +93,7 @@ let _clusterLayer = null;
 let _autoSpiderfyLayers = [];
 let _mapRendering = false;
 let _autoSpiderfyRefreshTimer = null;
+let _handleMapViewChange = null;
 const MIN_AUTO_SPIDERFY_PERSONS = 2;
 const AUTO_SPIDERFY_MAX_PERSONS = 8;
 const COORDINATE_GROUPING_PRECISION = 6;
@@ -116,7 +117,9 @@ function initMap() {
   }).addTo(_map);
 
   _clusterLayer = L.markerClusterGroup().addTo(_map);
-  _map.on('zoomend moveend', _queueAutoSpiderfy);
+  _handleMapViewChange = _handleMapViewChange || (() => _queueAutoSpiderfy());
+  _map.off('zoomend moveend', _handleMapViewChange);
+  _map.on('zoomend moveend', _handleMapViewChange);
 }
 
 function _clearAutoSpiderfyLayers() {
