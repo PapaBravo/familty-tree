@@ -96,6 +96,8 @@ const MIN_AUTO_SPIDERFY_PERSONS = 2;
 const AUTO_SPIDERFY_MAX_PERSONS = 8;
 const COORDINATE_GROUPING_PRECISION = 6;
 const CLUSTER_ANIMATION_TIMEOUT_MS = 250;
+const AUTO_SPIDERFY_RETRY_DELAY_MS = 100;
+const AUTO_SPIDERFY_MAX_RETRIES = 10;
 
 /* -------------------------------------------------------
    Initialisation
@@ -307,7 +309,7 @@ function _scheduleAutoSpiderfy() {
     const onLayerReady = () => {
       pendingLayers--;
       if (pendingLayers === 0) {
-        _autoSpiderfyLayers.forEach(_spiderfyLayerCluster);
+        _retryAutoSpiderfy();
       }
     };
 
@@ -337,22 +339,38 @@ function _scheduleAutoSpiderfy() {
   window.setTimeout(onMapSettled, 0);
 }
 
+function _retryAutoSpiderfy(attempt = 0) {
+  const allReady = _autoSpiderfyLayers.every(_spiderfyLayerCluster);
+  if (allReady || attempt >= AUTO_SPIDERFY_MAX_RETRIES) return;
+
+  window.setTimeout(() => _retryAutoSpiderfy(attempt + 1), AUTO_SPIDERFY_RETRY_DELAY_MS);
+}
+
 function _spiderfyLayerCluster(layer) {
   if (!layer || !layer._featureGroup) return;
 
   let visibleCluster = null;
+  let individualMarkerCount = 0;
   layer._featureGroup.eachLayer(featureLayer => {
-    if (visibleCluster) return;
-    if (!(featureLayer instanceof L.MarkerCluster)) return;
-    if (!featureLayer._icon) return;
+    if (featureLayer instanceof L.MarkerCluster) {
+      if (visibleCluster || !featureLayer._icon) return;
 
-    const childCount = featureLayer.getChildCount();
-    if (childCount > 1 && childCount <= AUTO_SPIDERFY_MAX_PERSONS) {
-      visibleCluster = featureLayer;
+      const childCount = featureLayer.getChildCount();
+      if (childCount > 1 && childCount <= AUTO_SPIDERFY_MAX_PERSONS) {
+        visibleCluster = featureLayer;
+      }
+      return;
     }
+
+    if (featureLayer instanceof L.Marker && featureLayer._icon) individualMarkerCount++;
   });
 
-  if (visibleCluster) visibleCluster.spiderfy();
+  if (visibleCluster) {
+    visibleCluster.spiderfy();
+    return true;
+  }
+
+  return individualMarkerCount >= MIN_AUTO_SPIDERFY_PERSONS;
 }
 
 function _renderMarkers(entries, targetLayer) {
