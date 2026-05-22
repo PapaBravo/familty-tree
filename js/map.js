@@ -92,7 +92,9 @@ let _map = null;
 let _clusterLayer = null;
 let _autoSpiderfyLayers = [];
 let _mapRendering = false;
+const MIN_AUTO_SPIDERFY_PERSONS = 2;
 const AUTO_SPIDERFY_MAX_PERSONS = 8;
+const COORDINATE_GROUPING_PRECISION = 6;
 const CLUSTER_ANIMATION_TIMEOUT_MS = 250;
 
 /* -------------------------------------------------------
@@ -264,7 +266,7 @@ async function renderMap() {
   const clusteredEntries = [];
 
   groupedEntries.forEach(group => {
-    if (group.length >= 2 && group.length <= AUTO_SPIDERFY_MAX_PERSONS) {
+    if (group.length >= MIN_AUTO_SPIDERFY_PERSONS && group.length <= AUTO_SPIDERFY_MAX_PERSONS) {
       _renderMarkers(group, _createAutoSpiderfyLayer());
       return;
     }
@@ -286,7 +288,7 @@ function _groupEntriesByCoordinate(entries) {
   const groups = new Map();
 
   entries.forEach(entry => {
-    const key = `${entry.coords.lat.toFixed(6)},${entry.coords.lon.toFixed(6)}`;
+    const key = `${entry.coords.lat.toFixed(COORDINATE_GROUPING_PRECISION)},${entry.coords.lon.toFixed(COORDINATE_GROUPING_PRECISION)}`;
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key).push(entry);
   });
