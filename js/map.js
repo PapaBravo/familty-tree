@@ -97,6 +97,7 @@ const MIN_AUTO_SPIDERFY_PERSONS = 2;
 const AUTO_SPIDERFY_MAX_PERSONS = 8;
 const COORDINATE_GROUPING_PRECISION = 6;
 const CLUSTER_ANIMATION_TIMEOUT_MS = 250;
+const AUTO_SPIDERFY_REFRESH_DEBOUNCE_MS = 150;
 const AUTO_SPIDERFY_RETRY_DELAY_MS = 100;
 const AUTO_SPIDERFY_RETRY_TIMEOUT_MS = 3000;
 const AUTO_SPIDERFY_MAX_RETRIES = Math.ceil(AUTO_SPIDERFY_RETRY_TIMEOUT_MS / AUTO_SPIDERFY_RETRY_DELAY_MS);
@@ -144,7 +145,7 @@ function _queueAutoSpiderfy() {
   _autoSpiderfyRefreshTimer = window.setTimeout(() => {
     _autoSpiderfyRefreshTimer = null;
     _scheduleAutoSpiderfy();
-  }, 0);
+  }, AUTO_SPIDERFY_REFRESH_DEBOUNCE_MS);
 }
 
 /* -------------------------------------------------------
