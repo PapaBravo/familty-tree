@@ -97,7 +97,7 @@ const AUTO_SPIDERFY_MAX_PERSONS = 8;
 const COORDINATE_GROUPING_PRECISION = 6;
 const CLUSTER_ANIMATION_TIMEOUT_MS = 250;
 const AUTO_SPIDERFY_RETRY_DELAY_MS = 100;
-const AUTO_SPIDERFY_MAX_RETRIES = 10;
+const AUTO_SPIDERFY_MAX_RETRIES = 30;
 
 /* -------------------------------------------------------
    Initialisation
@@ -347,10 +347,9 @@ function _retryAutoSpiderfy(attempt = 0) {
 }
 
 function _spiderfyLayerCluster(layer) {
-  if (!layer || !layer._featureGroup) return;
+  if (!layer || !layer._featureGroup) return false;
 
   let visibleCluster = null;
-  let individualMarkerCount = 0;
   layer._featureGroup.eachLayer(featureLayer => {
     if (featureLayer instanceof L.MarkerCluster) {
       if (visibleCluster || !featureLayer._icon) return;
@@ -361,8 +360,6 @@ function _spiderfyLayerCluster(layer) {
       }
       return;
     }
-
-    if (featureLayer instanceof L.Marker && featureLayer._icon) individualMarkerCount++;
   });
 
   if (visibleCluster) {
@@ -370,7 +367,7 @@ function _spiderfyLayerCluster(layer) {
     return true;
   }
 
-  return individualMarkerCount >= MIN_AUTO_SPIDERFY_PERSONS;
+  return false;
 }
 
 function _renderMarkers(entries, targetLayer) {
