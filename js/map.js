@@ -286,7 +286,7 @@ function _groupEntriesByCoordinate(entries) {
   const groups = new Map();
 
   entries.forEach(entry => {
-    const key = `${entry.coords.lat},${entry.coords.lon}`;
+    const key = `${entry.coords.lat.toFixed(6)},${entry.coords.lon.toFixed(6)}`;
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key).push(entry);
   });
@@ -354,6 +354,8 @@ function _spiderfyLayerCluster(layer) {
 }
 
 function _renderMarkers(entries, targetLayer) {
+  if (!targetLayer) return;
+
   for (const { person, place, coords } of entries) {
     const icon = _buildMarkerIcon(person);
     const marker = L.marker([coords.lat, coords.lon], { icon, title: person.name });
