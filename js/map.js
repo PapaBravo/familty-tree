@@ -97,7 +97,8 @@ const AUTO_SPIDERFY_MAX_PERSONS = 8;
 const COORDINATE_GROUPING_PRECISION = 6;
 const CLUSTER_ANIMATION_TIMEOUT_MS = 250;
 const AUTO_SPIDERFY_RETRY_DELAY_MS = 100;
-const AUTO_SPIDERFY_MAX_RETRIES = 30;
+const AUTO_SPIDERFY_RETRY_TIMEOUT_MS = 3000;
+const AUTO_SPIDERFY_MAX_RETRIES = Math.ceil(AUTO_SPIDERFY_RETRY_TIMEOUT_MS / AUTO_SPIDERFY_RETRY_DELAY_MS);
 
 /* -------------------------------------------------------
    Initialisation
@@ -298,7 +299,7 @@ function _groupEntriesByCoordinate(entries) {
   return Array.from(groups.values());
 }
 
-function _latLngDiffers(a, b) {
+function _areLatLngsDifferent(a, b) {
   return !!a && !!b && (a.lat !== b.lat || a.lng !== b.lng);
 }
 
@@ -343,11 +344,11 @@ function _scheduleAutoSpiderfy() {
   window.setTimeout(onMapSettled, 0);
 }
 
-function _retryAutoSpiderfy(attempt = 0) {
-  const allReady = _autoSpiderfyLayers.every(_spiderfyLayerCluster);
-  if (allReady || attempt >= AUTO_SPIDERFY_MAX_RETRIES) return;
+function _retryAutoSpiderfy(pendingLayers = _autoSpiderfyLayers, attempt = 0) {
+  const remainingLayers = pendingLayers.filter(layer => !_spiderfyLayerCluster(layer));
+  if (remainingLayers.length === 0 || attempt >= AUTO_SPIDERFY_MAX_RETRIES) return;
 
-  window.setTimeout(() => _retryAutoSpiderfy(attempt + 1), AUTO_SPIDERFY_RETRY_DELAY_MS);
+  window.setTimeout(() => _retryAutoSpiderfy(remainingLayers, attempt + 1), AUTO_SPIDERFY_RETRY_DELAY_MS);
 }
 
 function _spiderfyLayerCluster(layer) {
@@ -371,14 +372,14 @@ function _spiderfyLayerCluster(layer) {
   const childMarkers = visibleCluster.getAllChildMarkers();
   const clusterCenter = visibleCluster.getLatLng();
   const isExpanded = childMarkers.some(marker => {
-    return _latLngDiffers(marker.getLatLng(), clusterCenter);
+    return _areLatLngsDifferent(marker.getLatLng(), clusterCenter);
   });
   if (isExpanded) return true;
 
   const beforePositions = childMarkers.map(marker => marker.getLatLng());
   visibleCluster.spiderfy();
 
-  return childMarkers.some((marker, index) => _latLngDiffers(marker.getLatLng(), beforePositions[index]));
+  return childMarkers.some((marker, index) => _areLatLngsDifferent(marker.getLatLng(), beforePositions[index]));
 }
 
 function _renderMarkers(entries, targetLayer) {
