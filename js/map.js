@@ -362,12 +362,26 @@ function _spiderfyLayerCluster(layer) {
     }
   });
 
-  if (visibleCluster) {
-    visibleCluster.spiderfy();
-    return true;
-  }
+  if (!visibleCluster) return false;
 
-  return false;
+  const childMarkers = visibleCluster.getAllChildMarkers();
+  const clusterCenter = visibleCluster.getLatLng();
+  const isExpanded = childMarkers.some(marker => {
+    const pos = marker.getLatLng();
+    return pos.lat !== clusterCenter.lat || pos.lng !== clusterCenter.lng;
+  });
+  if (isExpanded) return true;
+
+  const beforePositions = childMarkers.map(marker => {
+    const pos = marker.getLatLng();
+    return `${pos.lat},${pos.lng}`;
+  });
+  visibleCluster.spiderfy();
+
+  return childMarkers.some((marker, index) => {
+    const pos = marker.getLatLng();
+    return `${pos.lat},${pos.lng}` !== beforePositions[index];
+  });
 }
 
 function _renderMarkers(entries, targetLayer) {
