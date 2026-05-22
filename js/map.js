@@ -263,7 +263,7 @@ async function renderMap() {
   const clusteredEntries = [];
 
   groupedEntries.forEach(group => {
-    if (group.length > 1 && group.length <= AUTO_SPIDERFY_MAX_PERSONS) {
+    if (group.length >= 2 && group.length <= AUTO_SPIDERFY_MAX_PERSONS) {
       _renderMarkers(group, _createAutoSpiderfyLayer());
       return;
     }
@@ -294,20 +294,43 @@ function _groupEntriesByCoordinate(entries) {
 }
 
 function _scheduleAutoSpiderfy() {
-  if (_autoSpiderfyLayers.length === 0) return;
+  if (!_map || _autoSpiderfyLayers.length === 0) return;
 
-  const waitForMap = () => {
-    const layerAnimating = [_clusterLayer, ..._autoSpiderfyLayers]
-      .some(layer => layer && layer._inZoomAnimation);
-    if ((_map && _map._animatingZoom) || layerAnimating) {
-      window.requestAnimationFrame(waitForMap);
-      return;
-    }
+  let mapSettled = false;
+  const waitForClusterAnimations = () => {
+    const layers = [_clusterLayer, ..._autoSpiderfyLayers];
+    let pendingLayers = layers.length;
 
-    _autoSpiderfyLayers.forEach(_spiderfyLayerCluster);
+    const onLayerReady = () => {
+      pendingLayers--;
+      if (pendingLayers === 0) {
+        _autoSpiderfyLayers.forEach(_spiderfyLayerCluster);
+      }
+    };
+
+    layers.forEach(layer => {
+      let resolved = false;
+      const finish = () => {
+        if (resolved) return;
+        resolved = true;
+        layer.off('animationend', finish);
+        onLayerReady();
+      };
+
+      layer.once('animationend', finish);
+      window.setTimeout(finish, 250);
+    });
   };
 
-  window.requestAnimationFrame(waitForMap);
+  const onMapSettled = () => {
+    if (mapSettled) return;
+    mapSettled = true;
+    _map.off('moveend', onMapSettled);
+    waitForClusterAnimations();
+  };
+
+  _map.once('moveend', onMapSettled);
+  window.setTimeout(onMapSettled, 0);
 }
 
 function _spiderfyLayerCluster(layer) {
