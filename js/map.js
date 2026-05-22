@@ -298,6 +298,10 @@ function _groupEntriesByCoordinate(entries) {
   return Array.from(groups.values());
 }
 
+function _latLngDiffers(a, b) {
+  return !!a && !!b && (a.lat !== b.lat || a.lng !== b.lng);
+}
+
 function _scheduleAutoSpiderfy() {
   if (!_map || _autoSpiderfyLayers.length === 0) return;
 
@@ -367,21 +371,14 @@ function _spiderfyLayerCluster(layer) {
   const childMarkers = visibleCluster.getAllChildMarkers();
   const clusterCenter = visibleCluster.getLatLng();
   const isExpanded = childMarkers.some(marker => {
-    const pos = marker.getLatLng();
-    return pos.lat !== clusterCenter.lat || pos.lng !== clusterCenter.lng;
+    return _latLngDiffers(marker.getLatLng(), clusterCenter);
   });
   if (isExpanded) return true;
 
-  const beforePositions = childMarkers.map(marker => {
-    const pos = marker.getLatLng();
-    return `${pos.lat},${pos.lng}`;
-  });
+  const beforePositions = childMarkers.map(marker => marker.getLatLng());
   visibleCluster.spiderfy();
 
-  return childMarkers.some((marker, index) => {
-    const pos = marker.getLatLng();
-    return `${pos.lat},${pos.lng}` !== beforePositions[index];
-  });
+  return childMarkers.some((marker, index) => _latLngDiffers(marker.getLatLng(), beforePositions[index]));
 }
 
 function _renderMarkers(entries, targetLayer) {
