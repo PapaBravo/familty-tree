@@ -93,6 +93,7 @@ let _clusterLayer = null;
 let _autoSpiderfyLayers = [];
 let _mapRendering = false;
 const AUTO_SPIDERFY_MAX_PERSONS = 8;
+const CLUSTER_ANIMATION_TIMEOUT_MS = 250;
 
 /* -------------------------------------------------------
    Initialisation
@@ -318,7 +319,7 @@ function _scheduleAutoSpiderfy() {
       };
 
       layer.once('animationend', finish);
-      window.setTimeout(finish, 250);
+      window.setTimeout(finish, CLUSTER_ANIMATION_TIMEOUT_MS);
     });
   };
 
@@ -330,6 +331,7 @@ function _scheduleAutoSpiderfy() {
   };
 
   _map.once('moveend', onMapSettled);
+  // Fallback in case fitBounds keeps the current view and no moveend fires.
   window.setTimeout(onMapSettled, 0);
 }
 

@@ -20,7 +20,7 @@ Core family data stays in the browser, with optional map features that call Open
 - Uploaded photos are stored in `IndexedDB`
 - The sample dataset is fetched from `data/sample-family.json` on first run
 - The map view loads OpenStreetMap tiles and geocodes place names through Nominatim when coordinates are missing
-- Co-located birth-place markers are auto-expanded by default when a cluster has fewer than 9 people
+- Co-located birth-place markers are auto-expanded by default when a cluster has 8 or fewer people
 
 ## Local development
 
