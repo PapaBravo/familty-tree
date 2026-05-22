@@ -92,10 +92,12 @@ let _map = null;
 let _clusterLayer = null;
 let _autoSpiderfyLayers = [];
 let _mapRendering = false;
+let _autoSpiderfyRefreshTimer = null;
 const MIN_AUTO_SPIDERFY_PERSONS = 2;
 const AUTO_SPIDERFY_MAX_PERSONS = 8;
 const COORDINATE_GROUPING_PRECISION = 6;
 const CLUSTER_ANIMATION_TIMEOUT_MS = 250;
+const AUTO_SPIDERFY_REFRESH_DEBOUNCE_MS = 150;
 const AUTO_SPIDERFY_RETRY_DELAY_MS = 100;
 const AUTO_SPIDERFY_RETRY_TIMEOUT_MS = 3000;
 const AUTO_SPIDERFY_MAX_RETRIES = Math.ceil(AUTO_SPIDERFY_RETRY_TIMEOUT_MS / AUTO_SPIDERFY_RETRY_DELAY_MS);
@@ -114,6 +116,7 @@ function initMap() {
   }).addTo(_map);
 
   _clusterLayer = L.markerClusterGroup().addTo(_map);
+  _map.on('zoomend moveend', _handleMapViewChange);
 }
 
 function _clearAutoSpiderfyLayers() {
@@ -127,6 +130,26 @@ function _createAutoSpiderfyLayer() {
   const layer = L.markerClusterGroup().addTo(_map);
   _autoSpiderfyLayers.push(layer);
   return layer;
+}
+
+function _cancelQueuedAutoSpiderfy() {
+  if (_autoSpiderfyRefreshTimer === null) return;
+  window.clearTimeout(_autoSpiderfyRefreshTimer);
+  _autoSpiderfyRefreshTimer = null;
+}
+
+function _queueAutoSpiderfy() {
+  if (!_map || _mapRendering) return;
+
+  _cancelQueuedAutoSpiderfy();
+  _autoSpiderfyRefreshTimer = window.setTimeout(() => {
+    _autoSpiderfyRefreshTimer = null;
+    _scheduleAutoSpiderfy();
+  }, AUTO_SPIDERFY_REFRESH_DEBOUNCE_MS);
+}
+
+function _handleMapViewChange() {
+  _queueAutoSpiderfy();
 }
 
 /* -------------------------------------------------------
@@ -181,6 +204,7 @@ async function renderMap() {
   if (!_map) return;
   if (_mapRendering) return;
   _mapRendering = true;
+  _cancelQueuedAutoSpiderfy();
 
   // Let Leaflet recalculate container dimensions (needed after panel becomes visible)
   _map.invalidateSize();
@@ -282,9 +306,8 @@ async function renderMap() {
   // Fit bounds
   const latlngs = entries.map(e => [e.coords.lat, e.coords.lon]);
   _map.fitBounds(L.latLngBounds(latlngs), { padding: [40, 40], maxZoom: 10 });
-  _scheduleAutoSpiderfy();
-
   _mapRendering = false;
+  _queueAutoSpiderfy();
 }
 
 function _groupEntriesByCoordinate(entries) {
