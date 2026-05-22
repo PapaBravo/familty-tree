@@ -116,7 +116,6 @@ function initMap() {
   }).addTo(_map);
 
   _clusterLayer = L.markerClusterGroup().addTo(_map);
-  _map.off('zoomend moveend', _handleMapViewChange);
   _map.on('zoomend moveend', _handleMapViewChange);
 }
 
