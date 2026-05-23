@@ -167,6 +167,7 @@ button { cursor: pointer; font: inherit; }
 /* Link styles */
 .link { fill: none; stroke-width: 2; }
 .link.parent-child { stroke: var(--text-muted); stroke-dasharray: none; }
+.link.sibling-bond { stroke-opacity: 0; pointer-events: none; }
 .link.marriage { stroke: var(--marriage); stroke-width: 4; }
 .link.divorced { stroke: var(--divorced); stroke-dasharray: 6,3; }
 .link.partner { stroke: var(--partner); stroke-dasharray: 4,4; }

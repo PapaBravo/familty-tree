@@ -12,6 +12,7 @@ window.treeGraph = (() => {
   const PARENT_MIDPOINT_PULL = 0.55;
   const CHILD_MIDPOINT_PULL = 0.2;
   const PARTNER_GAP_CORRECTION = 0.25;
+  const FORCE_SIBLING_BOND_STRENGTH = 0.3;
 
   function buildRenderGraph(data, rootId, depth, renderMode) {
     if (renderMode === 'ancestors') {
@@ -591,11 +592,49 @@ window.treeGraph = (() => {
       });
     });
 
+    const siblingBondLinks = buildSiblingBondLinks(persons, personIdSet);
+
     return {
       renderMode: 'force',
       nodes: persons.map(person => ({ id: person.id, data: person })),
-      links: partnershipLinks.concat(parentChildLinks)
+      links: partnershipLinks.concat(parentChildLinks, siblingBondLinks)
     };
+  }
+
+  function buildSiblingBondLinks(persons, personIdSet) {
+    const siblingBondLinks = [];
+    for (let index = 0; index < persons.length; index++) {
+      const person = persons[index];
+      const parentIds = new Set(
+        (person.parents || [])
+          .map(parentRef => parentRef.personId)
+          .filter(parentId => personIdSet.has(parentId) && parentId !== person.id)
+      );
+      if (parentIds.size === 0) continue;
+
+      for (let siblingIndex = index + 1; siblingIndex < persons.length; siblingIndex++) {
+        const sibling = persons[siblingIndex];
+        if (sibling.id === person.id) continue;
+
+        let commonParentCount = 0;
+        (sibling.parents || []).forEach(parentRef => {
+          if (parentRef.personId !== sibling.id && parentIds.has(parentRef.personId)) {
+            commonParentCount += 1;
+          }
+        });
+
+        if (commonParentCount === 0) continue;
+
+        siblingBondLinks.push({
+          source: person.id,
+          target: sibling.id,
+          linkClass: 'sibling-bond',
+          strength: FORCE_SIBLING_BOND_STRENGTH * (1 + 0.2 * (commonParentCount - 1))
+        });
+      }
+    }
+
+    return siblingBondLinks;
   }
 
   function buildPersonMap(persons) {
