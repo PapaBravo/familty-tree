@@ -12,6 +12,7 @@ window.treeGraph = (() => {
   const PARENT_MIDPOINT_PULL = 0.55;
   const CHILD_MIDPOINT_PULL = 0.2;
   const PARTNER_GAP_CORRECTION = 0.25;
+  const FORCE_SIBLING_BOND_STRENGTH = 0.3;
 
   function buildRenderGraph(data, rootId, depth, renderMode) {
     if (renderMode === 'ancestors') {
@@ -591,11 +592,57 @@ window.treeGraph = (() => {
       });
     });
 
+    const siblingBondLinks = buildSiblingBondLinks(persons, personIdSet);
+
     return {
       renderMode: 'force',
       nodes: persons.map(person => ({ id: person.id, data: person })),
-      links: partnershipLinks.concat(parentChildLinks)
+      links: partnershipLinks.concat(parentChildLinks, siblingBondLinks)
     };
+  }
+
+  function buildSiblingBondLinks(persons, personIdSet) {
+    const childIdsByParentId = new Map();
+    persons.forEach(person => {
+      getRenderableParentIdSet(person, personIdSet).forEach(parentId => {
+        if (!childIdsByParentId.has(parentId)) childIdsByParentId.set(parentId, []);
+        childIdsByParentId.get(parentId).push(person.id);
+      });
+    });
+
+    const sharedParentCounts = new Map();
+    childIdsByParentId.forEach(childIds => {
+      for (let i = 0; i < childIds.length; i++) {
+        for (let j = i + 1; j < childIds.length; j++) {
+          const pairKey = buildPersonPairKey(childIds[i], childIds[j]);
+          sharedParentCounts.set(pairKey, (sharedParentCounts.get(pairKey) || 0) + 1);
+        }
+      }
+    });
+
+    return Array.from(sharedParentCounts.entries(), ([pairKey, commonParentCount]) => {
+      const [source, target] = pairKey.split('\u0000');
+      return {
+        source,
+        target,
+        linkClass: 'sibling-bond',
+        strength: FORCE_SIBLING_BOND_STRENGTH * (1 + 0.2 * (commonParentCount - 1))
+      };
+    });
+  }
+
+  function getRenderableParentIdSet(person, personIdSet) {
+    return new Set(
+      (person.parents || [])
+        .map(parentRef => parentRef.personId)
+        .filter(parentId => personIdSet.has(parentId) && parentId !== person.id)
+    );
+  }
+
+  function buildPersonPairKey(personIdA, personIdB) {
+    return personIdA < personIdB
+      ? `${personIdA}\u0000${personIdB}`
+      : `${personIdB}\u0000${personIdA}`;
   }
 
   function buildPersonMap(persons) {
