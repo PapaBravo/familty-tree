@@ -1,7 +1,7 @@
 window.treeGraph = (() => {
   const NODE_R = 36;
   const NODE_CLEARANCE = 8;
-  const H_SEP = NODE_R * 2 + NODE_CLEARANCE;
+  const H_SEP = NODE_R * 2 + NODE_CLEARANCE + 20;
   const V_SEP = 160;
   const PARTNER_ROW_PROXIMITY = 12;
   const MIN_PARTNER_DISTANCE_FACTOR = 0.8;
