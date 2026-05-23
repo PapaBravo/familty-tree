@@ -604,7 +604,7 @@ window.treeGraph = (() => {
   function buildSiblingBondLinks(persons, personIdSet) {
     const childIdsByParentId = new Map();
     persons.forEach(person => {
-      getRenderableParentIds(person, personIdSet).forEach(parentId => {
+      getRenderableParentIdSet(person, personIdSet).forEach(parentId => {
         if (!childIdsByParentId.has(parentId)) childIdsByParentId.set(parentId, []);
         childIdsByParentId.get(parentId).push(person.id);
       });
@@ -612,9 +612,9 @@ window.treeGraph = (() => {
 
     const sharedParentCounts = new Map();
     childIdsByParentId.forEach(childIds => {
-      for (let firstIndex = 0; firstIndex < childIds.length; firstIndex++) {
-        for (let secondIndex = firstIndex + 1; secondIndex < childIds.length; secondIndex++) {
-          const pairKey = buildPersonPairKey(childIds[firstIndex], childIds[secondIndex]);
+      for (let i = 0; i < childIds.length; i++) {
+        for (let j = i + 1; j < childIds.length; j++) {
+          const pairKey = buildPersonPairKey(childIds[i], childIds[j]);
           sharedParentCounts.set(pairKey, (sharedParentCounts.get(pairKey) || 0) + 1);
         }
       }
@@ -631,7 +631,7 @@ window.treeGraph = (() => {
     });
   }
 
-  function getRenderableParentIds(person, personIdSet) {
+  function getRenderableParentIdSet(person, personIdSet) {
     return new Set(
       (person.parents || [])
         .map(parentRef => parentRef.personId)
