@@ -603,8 +603,8 @@ window.treeGraph = (() => {
 
   function buildSiblingBondLinks(persons, personIdSet) {
     const siblingBondLinks = [];
-    for (let index = 0; index < persons.length; index++) {
-      const person = persons[index];
+    for (let personIndex = 0; personIndex < persons.length; personIndex++) {
+      const person = persons[personIndex];
       const parentIds = new Set(
         (person.parents || [])
           .map(parentRef => parentRef.personId)
@@ -612,7 +612,7 @@ window.treeGraph = (() => {
       );
       if (parentIds.size === 0) continue;
 
-      for (let siblingIndex = index + 1; siblingIndex < persons.length; siblingIndex++) {
+      for (let siblingIndex = personIndex + 1; siblingIndex < persons.length; siblingIndex++) {
         const sibling = persons[siblingIndex];
         const siblingParentIds = new Set(
           (sibling.parents || [])
