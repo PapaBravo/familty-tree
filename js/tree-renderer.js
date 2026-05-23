@@ -241,7 +241,7 @@ window.treeRenderer = (() => {
         .id(node => node.id)
         .strength(link => link.strength)
         .distance(H_SEP * 1.1))
-      .force('charge', d3.forceManyBody().strength(-300))
+      .force('charge', d3.forceManyBody().strength(-200))
       .force('center', d3.forceCenter(width / 2, height / 2))
       .force('collide', d3.forceCollide(NODE_R + 10))
       .on('tick', () => {
