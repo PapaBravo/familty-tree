@@ -602,40 +602,47 @@ window.treeGraph = (() => {
   }
 
   function buildSiblingBondLinks(persons, personIdSet) {
-    const siblingBondLinks = [];
-    for (let personIndex = 0; personIndex < persons.length; personIndex++) {
-      const person = persons[personIndex];
-      const parentIds = new Set(
-        (person.parents || [])
-          .map(parentRef => parentRef.personId)
-          .filter(parentId => personIdSet.has(parentId) && parentId !== person.id)
-      );
-      if (parentIds.size === 0) continue;
+    const childIdsByParentId = new Map();
+    persons.forEach(person => {
+      getRenderableParentIds(person, personIdSet).forEach(parentId => {
+        if (!childIdsByParentId.has(parentId)) childIdsByParentId.set(parentId, []);
+        childIdsByParentId.get(parentId).push(person.id);
+      });
+    });
 
-      for (let siblingIndex = personIndex + 1; siblingIndex < persons.length; siblingIndex++) {
-        const sibling = persons[siblingIndex];
-        const siblingParentIds = new Set(
-          (sibling.parents || [])
-            .map(parentRef => parentRef.personId)
-            .filter(parentId => personIdSet.has(parentId) && parentId !== sibling.id)
-        );
-        let commonParentCount = 0;
-        siblingParentIds.forEach(parentId => {
-          if (parentIds.has(parentId)) commonParentCount += 1;
-        });
-
-        if (commonParentCount === 0) continue;
-
-        siblingBondLinks.push({
-          source: person.id,
-          target: sibling.id,
-          linkClass: 'sibling-bond',
-          strength: FORCE_SIBLING_BOND_STRENGTH * (1 + 0.2 * (commonParentCount - 1))
-        });
+    const sharedParentCounts = new Map();
+    childIdsByParentId.forEach(childIds => {
+      for (let firstIndex = 0; firstIndex < childIds.length; firstIndex++) {
+        for (let secondIndex = firstIndex + 1; secondIndex < childIds.length; secondIndex++) {
+          const pairKey = buildPersonPairKey(childIds[firstIndex], childIds[secondIndex]);
+          sharedParentCounts.set(pairKey, (sharedParentCounts.get(pairKey) || 0) + 1);
+        }
       }
-    }
+    });
 
-    return siblingBondLinks;
+    return Array.from(sharedParentCounts.entries(), ([pairKey, commonParentCount]) => {
+      const [source, target] = pairKey.split('\u0000');
+      return {
+        source,
+        target,
+        linkClass: 'sibling-bond',
+        strength: FORCE_SIBLING_BOND_STRENGTH * (1 + 0.2 * (commonParentCount - 1))
+      };
+    });
+  }
+
+  function getRenderableParentIds(person, personIdSet) {
+    return new Set(
+      (person.parents || [])
+        .map(parentRef => parentRef.personId)
+        .filter(parentId => personIdSet.has(parentId) && parentId !== person.id)
+    );
+  }
+
+  function buildPersonPairKey(personIdA, personIdB) {
+    return personIdA < personIdB
+      ? `${personIdA}\u0000${personIdB}`
+      : `${personIdB}\u0000${personIdA}`;
   }
 
   function buildPersonMap(persons) {
