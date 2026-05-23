@@ -616,11 +616,14 @@ window.treeGraph = (() => {
         const sibling = persons[siblingIndex];
         if (sibling.id === person.id) continue;
 
+        const siblingParentIds = new Set(
+          (sibling.parents || [])
+            .map(parentRef => parentRef.personId)
+            .filter(parentId => parentId !== sibling.id)
+        );
         let commonParentCount = 0;
-        (sibling.parents || []).forEach(parentRef => {
-          if (parentRef.personId !== sibling.id && parentIds.has(parentRef.personId)) {
-            commonParentCount += 1;
-          }
+        siblingParentIds.forEach(parentId => {
+          if (parentIds.has(parentId)) commonParentCount += 1;
         });
 
         if (commonParentCount === 0) continue;
